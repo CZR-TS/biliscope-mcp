@@ -118,7 +118,7 @@ export interface CommentsSummary {
 }
 
 // 支持的语言类型
-export type SupportedLanguage = 'zh-Hans' | 'zh-CN' | 'zh-Hant' | 'en' | 'ja' | 'ko';
+export type SupportedLanguage = 'zh-Hans' | 'zh-CN' | 'zh-Hant' | 'en' | 'ja' | 'ko' | 'ai-zh';
 
 // 评论详细程度类型
 export type CommentDetailLevel = 'brief' | 'detailed';
