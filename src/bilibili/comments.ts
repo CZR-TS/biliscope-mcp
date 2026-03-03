@@ -79,11 +79,11 @@ export async function getVideoCommentsData(
     // 尝试从缓存获取
     const cachedData = cacheManager.getCommentInfo(cacheKey);
     if (cachedData) {
-      console.log(`Cache hit for comments ${bvid}`);
+      console.error(`Cache hit for comments ${bvid}`);
       return cachedData;
     }
 
-    console.log(`Cache miss for comments ${bvid}, fetching from API`);
+    console.error(`Cache miss for comments ${bvid}, fetching from API`);
 
     // 获取视频基本信息以获取 CID
     const videoData = await getVideoInfo(bvid);
@@ -138,7 +138,7 @@ export async function getVideoCommentsData(
     return result;
   } catch (error) {
     if (error instanceof CommentsDisabledError) {
-      console.warn(`Comments disabled for video ${bvid}`);
+      console.error(`Comments disabled for video ${bvid}`);
       const result: CommentData = {
         comments: [],
         summary: {

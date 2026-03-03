@@ -52,7 +52,7 @@ class RetryManager {
         
         if (attempt > 0) {
           const delay = this.calculateDelay(attempt, baseDelay, maxDelay);
-          console.log(`Retrying attempt ${attempt}/${maxRetries} after ${delay}ms...`);
+          console.error(`Retrying attempt ${attempt}/${maxRetries} after ${delay}ms...`);
           await this.delay(delay);
         }
 
@@ -79,7 +79,7 @@ class RetryManager {
           throw error;
         }
 
-        console.log(`Attempt ${attempt} failed, will retry:`, error.message);
+        console.error(`Attempt ${attempt} failed, will retry:`, error.message);
       }
     }
 

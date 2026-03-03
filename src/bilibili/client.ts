@@ -298,7 +298,7 @@ export async function fetchWithWBI(
           }
         });
         
-        console.log('发送WBI请求:', {
+        console.error('发送WBI请求:', {
           url: url.toString(),
           headers: safeHeaders
         });
@@ -382,7 +382,7 @@ export async function fetchWithoutWBI(
   params?: Record<string, string | number>,
   additionalHeaders: Record<string, string> = {}
 ): Promise<unknown> {
-  console.log(`[DEBUG] fetchWithoutWBI: ${path}`, params);
+  console.error(`[DEBUG] fetchWithoutWBI: ${path}`, params);
   return retryableFetch(async () => {
     return throttledFetch(async (controller) => {
       try {
@@ -392,7 +392,7 @@ export async function fetchWithoutWBI(
             url.searchParams.append(key, String(value));
           });
         }
-        console.log(`[DEBUG] Fetching URL: ${url.toString()}`);
+        console.error(`[DEBUG] Fetching URL: ${url.toString()}`);
 
         const response = await fetch(url.toString(), {
           headers: {
@@ -564,7 +564,7 @@ export async function getVideoComments(
     mode: "3" // 3表示按热度排序
   };
   
-  console.log('获取视频评论:', {
+  console.error('获取视频评论:', {
     bvid,
     oid: Number(oid),
     type,
@@ -612,21 +612,21 @@ export async function getVideoComments(
   try {
     // 优先尝试带WBI签名的评论API（需要有效的登录Cookie）
     const wbiPath = "/x/v2/reply/wbi/main";
-    console.log('尝试使用WBI评论API:', wbiPath);
+    console.error('尝试使用WBI评论API:', wbiPath);
 
     const mainResult = await fetchWithWBI(wbiPath, params, customHeaders) as any;
     
     // 如果WBI接口成功但返回空评论（可能是Cookie过期导致未登录），
     // 则自动降级到无需鉴权的普通接口
     if (mainResult && (!mainResult.replies || mainResult.replies.length === 0)) {
-      console.warn('WBI评论API返回空评论，降级到普通评论API（无需登录）');
+      console.error('WBI评论API返回空评论，降级到普通评论API（无需登录）');
       return await fetchCommentsWithFallback();
     }
     
     return mainResult;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.warn('❌ WBI评论API失败，降级到普通评论API:', errorMsg);
+    console.error('❌ WBI评论API失败，降级到普通评论API:', errorMsg);
     
     // 降级到无需WBI签名的普通评论API（携带 buvid 以规避 -352 风控）
     try {

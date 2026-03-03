@@ -95,11 +95,11 @@ export async function getVideoInfoWithSubtitle(
     // 尝试从缓存获取
     const cachedData = cacheManager.getVideoInfo(cacheKey);
     if (cachedData) {
-      console.log(`Cache hit for video ${bvid}`);
+      console.error(`Cache hit for video ${bvid}`);
       return cachedData;
     }
 
-    console.log(`Cache miss for video ${bvid}, fetching from API`);
+    console.error(`Cache miss for video ${bvid}, fetching from API`);
 
     // 获取视频基本信息
     const videoData = await getVideoInfo(bvid) as any;
@@ -113,7 +113,7 @@ export async function getVideoInfoWithSubtitle(
 
     // 检测付费视频
     if (videoData.need_login_subtitle || videoData.preview_toast?.includes("付费")) {
-      console.warn(`Video ${bvid} appears to be a paid video`);
+      console.error(`Video ${bvid} appears to be a paid video`);
       const result: SubtitleData = {
         data_source: "description",
         video_info: {
@@ -135,7 +135,7 @@ export async function getVideoInfoWithSubtitle(
 
       if (!subtitleData?.subtitle?.subtitles || subtitleData.subtitle.subtitles.length === 0) {
         // 没有字幕，使用简介作为降级方案
-        console.warn(`No subtitles available for video ${bvid}`);
+        console.error(`No subtitles available for video ${bvid}`);
         const result: SubtitleData = {
           data_source: "description",
           video_info: {
@@ -208,7 +208,7 @@ export async function getVideoInfoWithSubtitle(
       return result;
     } catch (error) {
       // 获取字幕失败，使用简介作为降级方案
-      console.warn(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
+      console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
       const result: SubtitleData = {
         data_source: "description",
         video_info: {
