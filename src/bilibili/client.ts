@@ -12,6 +12,9 @@ const BASE_URL = config.baseUrl;
 let cachedWBI: { imgKey: string; subKey: string; mixKey: string; expireTime: number } | null = null;
 const CACHE_EXPIRATION_MS = config.wbiCacheExpirationMs;
 
+// buvid 指纹缓存（用于规避反爬验证）
+let cachedBuvid: { buvid3: string; buvid4: string; expireTime: number } | null = null;
+
 // 请求限流 - 避免高频请求被 Bilibili 限制
 const RATE_LIMIT_MS = config.rateLimitMs;
 const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
@@ -100,6 +103,53 @@ function getMixKey(imgKey: string, subKey: string): string {
   const mixKey = imgKey + subKey;
   return saltTable.map((i) => mixKey[i]).join("");
 }
+
+/**
+ * 获取 buvid 指纹 Cookie（规避 Bilibili 反爬 -352 错误）
+ * buvid3/buvid4 是 Bilibili 用来识别浏览器的指纹 Cookie，
+ * 无需登录即可从 /x/frontend/finger/spi 接口获取
+ */
+async function getBuvid(): Promise<{ buvid3: string; buvid4: string } | null> {
+  const now = Date.now();
+  const BUVID_CACHE_MS = 24 * 60 * 60 * 1000; // 缓存 24 小时
+
+  if (cachedBuvid && cachedBuvid.expireTime > now) {
+    return { buvid3: cachedBuvid.buvid3, buvid4: cachedBuvid.buvid4 };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    const resp = await fetch(`${BASE_URL}/x/frontend/finger/spi`, {
+      headers: {
+        'User-Agent': config.userAgent,
+        'Referer': config.referer,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    if (data.code !== 0 || !data.data?.b_3 || !data.data?.b_4) return null;
+
+    cachedBuvid = {
+      buvid3: data.data.b_3,
+      buvid4: data.data.b_4,
+      expireTime: now + BUVID_CACHE_MS,
+    };
+
+    logger.info('Buvid fingerprint fetched', { buvid3: data.data.b_3.substring(0, 8) + '...' });
+    return { buvid3: cachedBuvid.buvid3, buvid4: cachedBuvid.buvid4 };
+  } catch (error) {
+    logger.warn('Failed to fetch buvid fingerprint, continuing without it',
+      { error: error instanceof Error ? error.message : error });
+    return null;
+  }
+}
+
 
 /**
  * 获取 WBI 签名密钥
@@ -219,8 +269,8 @@ export async function fetchWithWBI(
       try {
         const { mixKey } = await getWBI();
 
-        // 添加时间戳参数
-        params = { ...params, timestamp: Date.now() };
+        // 添加时间戳参数（WBI 要求 Unix 秒级时间戳，不是毫秒）
+        params = { ...params, timestamp: Math.floor(Date.now() / 1000) };
 
         // 生成签名
         const w_rid = generateWBISign(params, mixKey);
@@ -283,13 +333,14 @@ export async function fetchWithWBI(
             throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
           }
           if (data.code === -403) {
-            console.error('❌ 评论API返回权限错误:', {
+            console.error('❌ API返回权限错误(-403):', {
               code: data.code,
               message: data.message,
               url: url.toString(),
               params
             });
-            throw new PaidVideoError('该视频为付费内容，无法获取完整信息');
+            // 评论API的-403表示访问权限不足（未登录或Cookie过期），不是付费视频
+            throw new BilibiliAPIError(data.message || '访问权限不足，请检查登录凭证是否有效', 'ACCESS_DENIED', undefined, data);
           }
           
           console.error('❌ 评论API返回错误:', {
@@ -331,6 +382,7 @@ export async function fetchWithoutWBI(
   params?: Record<string, string | number>,
   additionalHeaders: Record<string, string> = {}
 ): Promise<unknown> {
+  console.log(`[DEBUG] fetchWithoutWBI: ${path}`, params);
   return retryableFetch(async () => {
     return throttledFetch(async (controller) => {
       try {
@@ -340,6 +392,7 @@ export async function fetchWithoutWBI(
             url.searchParams.append(key, String(value));
           });
         }
+        console.log(`[DEBUG] Fetching URL: ${url.toString()}`);
 
         const response = await fetch(url.toString(), {
           headers: {
@@ -501,15 +554,14 @@ export async function getVideoComments(
   // 构建标准Referer
   const baseVideoUrl = `https://www.bilibili.com/video/${bvid}/`;
   
-  // 构建评论API参数
+  // 构建评论API参数（fetchWithWBI 会自动添加 timestamp，无需手动添加 _ 参数）
   const params = {
     oid: Number(oid), // 确保oid是数字类型
     type,
     pn: page, // 页码
     ps: Math.min(pageSize, 20), // 每页评论数，最大20
     sort: sort.toString(), // 排序：0按时间，1按热度
-    mode: "3", // 3表示按热度排序
-    _: Date.now() // 时间戳，防止缓存
+    mode: "3" // 3表示按热度排序
   };
   
   console.log('获取视频评论:', {
@@ -528,60 +580,66 @@ export async function getVideoComments(
     ...authHeaders,
     "Referer": baseVideoUrl
   };
+
+  // 构建普通评论API参数（无需WBI签名）
+  const plainParams = {
+    oid: Number(oid),
+    type: Number(type),
+    pn: page,
+    ps: Math.min(pageSize, 20),
+    sort,
+    mode: 3
+  };
+
+  /**
+   * 构建带 buvid 指纹的 headers 并调用普通评论API
+   * buvid3/buvid4 用于规避 Bilibili 的 -352 风控验证
+   */
+  async function fetchCommentsWithFallback() {
+    const buvid = await getBuvid();
+    const buvidHeaders: Record<string, string> = { ...customHeaders };
+    if (buvid) {
+      // 将 buvid 附加到 Cookie 头部（如果已有 Cookie 则追加）
+      const existingCookie = buvidHeaders['Cookie'] || '';
+      const buvidCookie = `buvid3=${buvid.buvid3}; buvid4=${buvid.buvid4}`;
+      buvidHeaders['Cookie'] = existingCookie
+        ? `${existingCookie}; ${buvidCookie}`
+        : buvidCookie;
+    }
+    return fetchWithoutWBI("/x/v2/reply/main", plainParams, buvidHeaders);
+  }
   
   try {
-    // 尝试使用WBI评论API
+    // 优先尝试带WBI签名的评论API（需要有效的登录Cookie）
     const wbiPath = "/x/v2/reply/wbi/main";
-    console.log('尝试使用WBI评论API:', wbiPath, params);
+    console.log('尝试使用WBI评论API:', wbiPath);
+
+    const mainResult = await fetchWithWBI(wbiPath, params, customHeaders) as any;
     
-    // 构建完整URL用于错误日志
-    const url = new URL(wbiPath, BASE_URL);
-    Object.entries(params).forEach(([key, value]) => {
-      url.searchParams.append(key, String(value));
-    });
+    // 如果WBI接口成功但返回空评论（可能是Cookie过期导致未登录），
+    // 则自动降级到无需鉴权的普通接口
+    if (mainResult && (!mainResult.replies || mainResult.replies.length === 0)) {
+      console.warn('WBI评论API返回空评论，降级到普通评论API（无需登录）');
+      return await fetchCommentsWithFallback();
+    }
     
-    const mainResult = await fetchWithWBI(wbiPath, params, customHeaders);
     return mainResult;
   } catch (error) {
-    // 增强错误透传
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ 评论API请求失败:', {
-      error: errorMsg,
-      bvid,
-      oid: Number(oid),
-      type,
-      params,
-      referer: baseVideoUrl
-    });
+    console.warn('❌ WBI评论API失败，降级到普通评论API:', errorMsg);
     
-    // 尝试使用备用API
-    console.log('主评论API失败，尝试使用备用API:', errorMsg);
-    
-    // 尝试使用旧版评论API
-    const backupParams = {
-      oid: Number(oid),
-      type,
-      mode: "3",
-      pagination_str: JSON.stringify({ offset: "" }),
-      _: Date.now()
-    };
-    
-    console.log('尝试使用备用评论API:', '/x/v2/reply', backupParams);
-    
+    // 降级到无需WBI签名的普通评论API（携带 buvid 以规避 -352 风控）
     try {
-      const backupResult = await fetchWithWBI("/x/v2/reply", backupParams, customHeaders);
-      return backupResult;
-    } catch (backupError) {
-      const backupErrorMsg = backupError instanceof Error ? backupError.message : String(backupError);
-      console.error('❌ 备用评论API请求失败:', {
-        error: backupErrorMsg,
+      return await fetchCommentsWithFallback();
+    } catch (fallbackError) {
+      const fallbackErrorMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      console.error('❌ 普通评论API也失败:', {
+        error: fallbackErrorMsg,
         bvid,
         oid: Number(oid),
-        type,
-        params: backupParams,
-        referer: baseVideoUrl
       });
-      throw backupError;
+      throw fallbackError;
     }
   }
 }
+
