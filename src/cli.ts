@@ -43,22 +43,28 @@ async function configureCredentials() {
   rl.close();
 
   try {
-    credentialManager.setCredentials({
+    const credentials = {
       sessdata,
       bili_jct,
       dedeuserid,
       expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30天过期
-    });
+    };
 
-    console.log('凭证信息配置成功！');
+    // 写入内存
+    credentialManager.setCredentials(credentials);
+
+    // 持久化到全局配置文件 (~/.bilibili-mcp/config.json)
+    credentialManager.saveToFile(credentials);
+
+    // 导入配置路径以显示保存位置
+    const { GLOBAL_CONFIG_FILE } = await import('./utils/credentials.js');
+
     console.log('');
-    console.log('注意：');
-    console.log('1. 凭证信息将存储在内存中，重启工具后需要重新配置');
-    console.log('2. 您也可以通过设置环境变量来永久配置：');
-    console.log('   - BILIBILI_SESSDATA');
-    console.log('   - BILIBILI_BILI_JCT');
-    console.log('   - BILIBILI_DEDEUSERID');
-    console.log('3. 或创建 .env 文件（复制 .env.example 并填写）');
+    console.log('✅ 凭证配置成功，已永久保存至：');
+    console.log(`   ${GLOBAL_CONFIG_FILE}`);
+    console.log('');
+    console.log('下次启动 MCP 服务器时将自动加载此凭证，无需重新配置。');
+    console.log('⚠️  如需更新凭证，请重新运行 bilibili-mcp config');
 
   } catch (error) {
     console.error('配置失败：', error);

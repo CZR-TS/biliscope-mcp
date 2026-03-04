@@ -3,12 +3,20 @@
  * 用于安全地存储和管理用户的登录凭证
  */
 
+import fs from "fs";
+import path from "path";
+import os from "os";
+
 export interface BilibiliCredentials {
   sessdata: string;
   bili_jct: string;
   dedeuserid: string;
   expiresAt: number;
 }
+
+/** 全局配置文件路径: ~/.bilibili-mcp/config.json */
+export const GLOBAL_CONFIG_DIR = path.join(os.homedir(), ".bilibili-mcp");
+export const GLOBAL_CONFIG_FILE = path.join(GLOBAL_CONFIG_DIR, "config.json");
 
 export class CredentialManager {
   private static instance: CredentialManager;
@@ -46,6 +54,40 @@ export class CredentialManager {
   }
 
   /**
+   * 从全局配置文件加载凭证 (~/.bilibili-mcp/config.json)
+   */
+  loadFromFile(): BilibiliCredentials | null {
+    try {
+      if (!fs.existsSync(GLOBAL_CONFIG_FILE)) {
+        return null;
+      }
+      const raw = fs.readFileSync(GLOBAL_CONFIG_FILE, "utf-8");
+      const parsed = JSON.parse(raw) as BilibiliCredentials;
+      if (!parsed.sessdata || !parsed.bili_jct || !parsed.dedeuserid) {
+        return null;
+      }
+      this.credentials = parsed;
+      return this.credentials;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 将当前凭证持久化保存至全局配置文件
+   */
+  saveToFile(credentials: BilibiliCredentials): void {
+    if (!fs.existsSync(GLOBAL_CONFIG_DIR)) {
+      fs.mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      GLOBAL_CONFIG_FILE,
+      JSON.stringify(credentials, null, 2),
+      "utf-8",
+    );
+  }
+
+  /**
    * 设置凭证
    */
   setCredentials(credentials: BilibiliCredentials): void {
@@ -53,7 +95,7 @@ export class CredentialManager {
   }
 
   /**
-   * 获取凭证
+   * 获取凭证（优先级：内存 > 环境变量 > 全局配置文件）
    */
   getCredentials(): BilibiliCredentials | null {
     if (!this.credentials) {
@@ -61,11 +103,15 @@ export class CredentialManager {
     }
 
     if (!this.credentials) {
+      this.loadFromFile();
+    }
+
+    if (!this.credentials) {
       return null;
     }
 
     if (this.isExpired()) {
-      console.warn('Credentials have expired');
+      console.warn("Credentials have expired");
       this.credentials = null;
       return null;
     }
@@ -91,7 +137,7 @@ export class CredentialManager {
       return true;
     }
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    return Date.now() > (this.credentials.expiresAt - sevenDays);
+    return Date.now() > this.credentials.expiresAt - sevenDays;
   }
 
   /**
@@ -128,7 +174,7 @@ export class CredentialManager {
     }
 
     return {
-      'Cookie': `SESSDATA=${creds.sessdata}; bili_jct=${creds.bili_jct}; DedeUserID=${creds.dedeuserid}`,
+      Cookie: `SESSDATA=${creds.sessdata}; bili_jct=${creds.bili_jct}; DedeUserID=${creds.dedeuserid}`,
     };
   }
 }

@@ -1,61 +1,230 @@
 # Bilibili MCP Tool
-Bilibili MCP (Model Context Protocol) tool for video and comment summarization. Supports use with Claude Code, Cursor, Trae and other MCP compatible platforms.
+
+[![npm version](https://img.shields.io/npm/v/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
+
+A Bilibili video auxiliary MCP tool built based on mainstream AI development tools like Claude Code, Cursor, Trae, and Google Antigravity. It aims to quickly extract core video information, highlights, and popular comments through Large Language Model capabilities, helping you process audio and video content efficiently.
+
+View this document in [简体中文](./README.md).
 
 ---
 
-## Features
+## 📑 Table of Contents
+
+- [🌟 Features](#🌟-features)
+- [📋 Requirements](#📋-requirements)
+- [🚀 Installation](#🚀-installation)
+  - [Cursor](#cursor)
+  - [Claude Code](#claude-code)
+  - [Trae](#trae-official-ide-by-bytedance)
+  - [Windsurf](#windsurf-official-ide-by-codeium)
+  - [Zed](#zed)
+  - [Gemini CLI](#gemini-cli-official-google-cli)
+  - [Codex CLI](#codex-cli-official-openai-cli)
+  - [Antigravity](#antigravity-official-google-ide)
+  - [OpenCode](#opencode)
+- [⚙️ Credential Configuration](#⚙️-credential-configuration)
+- [💡 Usage Examples](#💡-usage-examples)
+- [🛡️ API Rate Limiting](#🛡️-api-rate-limiting)
+- [🛠️ Development Guide](#🛠️-development-guide)
+- [⚖️ Safety and Disclaimer](#⚖️-safety-and-disclaimer)
+
+---
+
+## 🌟 Features
 
 ### 1. Video Summarization (`get_video_info`)
-- Preferentially retrieves CC or AI subtitles
-- Falls back to video title, description and tags if no subtitles are available
-- Supports multi-language subtitle selection (default priority: Simplified Chinese)
-- Manual language specification supported
+- Prioritizes retrieving CC or AI subtitles.
+- Automatically falls back to video title, description, and tags if no subtitles are available.
+- Supports multi-language subtitle selection (defaults to Simplified Chinese).
+- Supports manual preference for subtitle languages (e.g., `en`, `zh-Hant`).
 
 ### 2. Comment Summarization (`get_video_comments`)
-- Retrieves popular video comments
-- Automatically filters emoji placeholders (e.g., `[doge]`)
-- Prioritizes comments with timestamps (e.g., `05:20`)
-- Supports two detail levels:
-  - `brief`: 10 popular comments
-  - `detailed`: 50 popular comments + high-quality replies
+- Retrieves popular comments to help gauge video sentiment.
+- Filters emoji placeholders (e.g., `[doge]`) for cleaner text.
+- Prioritizes comments with timestamps (e.g., `05:20`) for quick highlight location.
+- Supports two levels of detail:
+  - `brief`: 10 popular comments summary.
+  - `detailed`: 50 popular comments + high-quality replies.
 
-## Installation
+---
+
+## 📋 Requirements
+
+- **Node.js**: v18.0.0 or higher.
+- Bilibili Account Credentials (Cookies).
+
+---
+
+## 🚀 Installation
+
+### 🖱️ Cursor
+
+Cursor supports MCP natively. You can add it via the UI:
+
+1. Open Cursor Settings: `Cursor Settings` > `Features` > `MCP Servers`.
+2. Click **+ Add New MCP Server**.
+3. Fill in the following:
+   - **Name**: `bilibili-mcp`
+   - **Type**: Select `command`.
+   - **Command**: `npx -y @xzxzzx/bilibili-mcp` (If on Windows and facing path issues, try `cmd /k npx -y @xzxzzx/bilibili-mcp`).
+4. Click **Add**. You might need to click the refresh icon next to the server list to load tools.
+
+> **Tip**: Advanced users can also create a `.cursor/mcp.json` in the project root.
 
 ### Claude Code
 
-#### Method 1: Direct npm Installation (Recommended)
+#### Method 1: Fast Installation via CLI (Recommended)
 
-The simplest way is to install globally via npm:
+Run this command in your terminal:
+
+```bash
+claude mcp add bilibili-mcp --command "npx" --args "-y" --args "@xzxzzx/bilibili-mcp"
+```
+
+Restart Claude Code after completion.
+
+#### Method 2: Manual Addition via Config File
+
+1. Open Claude Code config (usually at `~/.claude.json`).
+2. Add the following to the `mcpServers` node:
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. Save and restart Claude Code.
+
+#### Method 3: Global npm Installation
+
+Manage configuration via the CLI tool after installation:
 
 ```bash
 npm install -g @xzxzzx/bilibili-mcp
 ```
 
-After installation:
+Verification & Inspection:
+1. `bilibili-mcp --help` (View help)
+2. `bilibili-mcp config` (Interactive cookie configuration)
+3. `bilibili-mcp check` (Check configuration status)
 
-1. Check if installation is successful:
-   ```bash
-   bilibili-mcp --help
-   ```
+### 🏗️ Trae (Official IDE by ByteDance)
 
-2. Configure Bilibili credentials (first use):
-   ```bash
-   bilibili-mcp config
-   ```
+Trae provides a very convenient UI for MCP integration:
 
-3. Check configuration status:
-   ```bash
-   bilibili-mcp check
-   ```
+1. Open Trae Settings: Click the gear icon -> **Settings** (or `Cmd/Ctrl + ,`).
+2. Go to **AI** tab -> **MCP**.
+3. Click **Add Server**.
+4. Enter:
+   - **Name**: `bilibili-mcp`
+   - **Type**: Select `command` (stdio)
+   - **Command**: `npx`
+   - **Arguments**: `["-y", "@xzxzzx/bilibili-mcp"]`
+5. Click **Save**.
 
-4. Use directly in Claude Code without additional configuration
+> **Tip**: Trae also automatically recognizes `.trae/mcp_config.json` in the project root.
 
-#### Method 2: Configuration File Installation (for development or custom paths)
+### 🌊 Windsurf (Official IDE by Codeium)
 
-1. Open Claude Code configuration file (typically at `~/.claude.json`)
-2. Add the following configuration to the `mcpServers` section:
+Windsurf supports integration via standard JSON config:
 
-**Using npx (Recommended):**
+1. Open Windsurf Settings: `Cmd/Ctrl + ,` -> Click **Advanced** -> **Cascade**.
+2. Click **Add custom server +** or **View raw config** (opens `mcp_config.json`).
+3. For manual editing, the path is usually:
+   - Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
+   - macOS/Linux: `~/.codeium/windsurf/mcp_config.json`
+4. Add to the `mcpServers` node:
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+5. Save and restart Windsurf.
+
+### ⚡ Zed
+
+Zed uses the `context_servers` field in `settings.json`:
+
+1. Open Zed Settings: `Cmd + ,` (macOS) or `Ctrl + ,` (Windows/Linux).
+2. Add or modify the `context_servers` node:
+
+```json
+{
+  "context_servers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. Save the file. Zed will automatically restart the Context Server.
+
+### ♊ Gemini CLI (Official Google CLI)
+
+Gemini CLI manages MCP via global or project-level `settings.json`:
+
+1. Locate global config:
+   - Windows: `%USERPROFILE%\.gemini\settings.json`
+   - macOS/Linux: `~/.gemini/settings.json`
+2. Add to the `mcpServers` node:
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. For project-level, create `.gemini/settings.json` in the project root.
+
+### ⌨️ Codex CLI (Official OpenAI CLI)
+
+Codex CLI uses TOML and supports quick addition via command line:
+
+**Method 1: CLI Addition (Recommended)**
+Run in terminal:
+```bash
+codex mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp
+```
+
+**Method 2: Manual Edit**
+1. Locate config: `~/.codex/config.toml` (Global) or `.codex/config.toml` (Project).
+2. Add:
+```toml
+[mcp_servers.bilibili-mcp]
+command = "npx"
+args = ["-y", "@xzxzzx/bilibili-mcp"]
+```
+
+### 🪐 Antigravity (Official Google IDE)
+
+Antigravity natively supports MCP. Add via UI or config file:
+
+**Method 1: UI Addition (Recommended)**
+1. Click `...` in the sidebar -> **MCP Store**.
+2. Click **Manage MCP Servers -> View raw config**.
+
+**Method 2: Manual Edit**
+- Windows: `%USERPROFILE%\.gemini\antigravity\mcp_config.json`
+- macOS/Linux: `~/.gemini/antigravity/mcp_config.json`
+
+Add to `mcpServers` node:
 ```json
 {
   "mcpServers": {
@@ -67,39 +236,12 @@ After installation:
 }
 ```
 
-**For local development:**
-```json
-{
-  "mcpServers": {
-    "bilibili-mcp": {
-      "command": "node",
-      "args": ["/path/to/bilibili-mcp/dist/index.js"]
-    }
-  }
-}
-```
+### 📦 OpenCode
 
-3. Save the configuration file
-4. Restart Claude Code for changes to take effect
+Edit the config file:
 
-#### Method 3: CLI Command Installation (Simplest)
-
-Simply run the following command:
-
-```bash
-claude mcp add bilibili-mcp npx -y @xzxzzx/bilibili-mcp
-```
-
-Then restart Claude Code.
-
-### OpenCode
-
-OpenCode is an open-source AI code editor that also supports MCP protocol.
-
-#### Method 1: Configuration File Installation
-
-1. Create or edit the OpenCode configuration file (located at `~/.config/opencode/opencode.json`)
-2. Add the following configuration to the `mcp` section:
+1. Edit `~/.config/opencode/opencode.json`.
+2. Add to `mcp` node:
 
 ```json
 {
@@ -114,262 +256,89 @@ OpenCode is an open-source AI code editor that also supports MCP protocol.
 }
 ```
 
-3. Save the configuration file
-4. Restart OpenCode for changes to take effect
+---
 
-#### Method 2: Local Development Mode
+## ⚙️ Credential Configuration
 
-For local development usage:
+Configure Bilibili Cookies for full comment data and to avoid anonymous limits.
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "bilibili-mcp": {
-      "type": "local",
-      "command": ["node", "/path/to/bilibili-mcp/dist/index.js"],
-      "enabled": true
-    }
-  }
-}
+### Method A: CLI Wizard (Recommended)
+If installed via npm, run:
+```bash
+bilibili-mcp config
 ```
+This wizard will guide you to enter credentials and save them **locally** (`~/.bilibili-mcp/config.json`). They are **never uploaded to any server**.
 
-### Environment Variables Configuration
+### Method B: Manual Environment Variables
+Create a `.env` file in the project root (or set in shell):
 
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open `.env` and configure as needed:
-   - `BILIBILI_SESSDATA`: Bilibili session data
-   - `BILIBILI_BILI_JCT`: Bilibili login credential
-   - `BILIBILI_DEDEUSERID`: Bilibili user ID
+| Variable | Description |
+| :--- | :--- |
+| **BILIBILI_SESSDATA** | Session Data (SESSDATA) |
+| **BILIBILI_BILI_JCT** | CSRF Token (bili_jct) |
+| **BILIBILI_DEDEUSERID** | User ID (DedeUserID) |
 
-**Note**: These variables can be obtained from browser developer tools (Cookie storage).
+<details>
+<summary>💡 How to get Bilibili Cookies</summary>
+
+1. Login to [bilibili.com](https://www.bilibili.com) in your browser.
+2. Press `F12` for Developer Tools.
+3. Go to **Application** tab -> **Cookies** -> `https://www.bilibili.com`.
+4. Copy values for `SESSDATA`, `bili_jct`, and `DedeUserID`.
+</details>
 
 #### 🔒 Security Notice
+- **Local Storage**: Your credentials are only stored on your local device.
+- **Config Isolation**: `.env` is ignored by git. **Do not commit it to public repos**.
+- **Expiration**: Cookies expire; re-acquire them if you encounter permission errors.
 
-- **.env files are not committed to Git** - included in `.gitignore`
-- **Do not share your .env file or Cookie values**
-- Cookies expire regularly and need to be re-acquired
-- It is recommended to use a secondary or test account's cookies
+---
 
-## Usage Examples
+## 💡 Usage Examples
 
-### Get Video Information (with subtitles)
+AI assistants will call these tools using JSON:
 
 ```json
+// Default language video info
 {
   "name": "get_video_info",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx"
-  }
+  "arguments": { "bvid_or_url": "BV1xx4x1x7xx" }
 }
-```
 
-### Get Video Information (specify language)
-
-```json
-{
-  "name": "get_video_info",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "preferred_lang": "en"
-  }
-}
-```
-
-### Get Comments (brief mode)
-
-```json
+// 10 popular comments summary
 {
   "name": "get_video_comments",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "detail_level": "brief"
-  }
+  "arguments": { "bvid_or_url": "BV1xx4x1x7xx", "detail_level": "brief" }
 }
 ```
 
-### Get Comments (detailed mode)
+---
 
-```json
-{
-  "name": "get_video_comments",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "detail_level": "detailed"
-  }
-}
-```
+## 🛡️ API Rate Limiting
 
-## Return Data Formats
+Built-in strategies to ensure long-term availability:
+- **Interval**: 500ms (0.5s).
+- **Execution**: Sequential queue, no concurrency.
 
-### Video Information Return Format
+---
 
-```json
-{
-  "data_source": "subtitle",
-  "video_info": {
-    "title": "Video Title",
-    "description": "Video description",
-    "tags": ["tag1", "tag2"],
-    "subtitle_text": "Subtitle content..."
-  }
-}
-```
-
-When `data_source` is `description`, it means no subtitles are available, only basic information.
-
-### Comments Return Format
-
-```json
-{
-  "comments": [
-    {
-      "author": "Username",
-      "content": "Comment content",
-      "likes": 123,
-      "has_timestamp": true,
-      "timestamp": "05:20"
-    }
-  ],
-  "summary": {
-    "total_comments": 50,
-    "comments_with_timestamp": 5
-  }
-}
-```
-
-## Security
-
-- ✅ Uses Bilibili public API
-- ✅ Sensitive information (Cookie) configured via environment variables, not committed to code repository
-- ✅ No user data stored
-- ✅ Open source auditable code
-- ✅ Error output uses `console.error` to avoid interfering with Stdio protocol
-- ⚠️ Users need to configure Bilibili Cookie themselves (stored in local .env file)
-
-## API Rate Limiting
-
-To comply with Bilibili API specifications and prevent being blocked, this tool implements request rate limiting:
-
-### Rate Limiting Configuration
-
-| Configuration Item | Value |
-|-------------------|-------|
-| Request Interval  | 500ms (0.5 seconds) |
-| Request Method    | Sequential queue processing, no concurrency |
-
-### Why Rate Limiting is Needed
-
-1. **Comply with Bilibili API specifications** - avoid high-frequency requests causing account or IP restrictions
-2. **Ensure stability** - reduce risk of API errors or rejection
-3. **Respect service provider** - use public resources responsibly
-
-### Impact on Users
-
-| Operation | Estimated Additional Delay |
-|-----------|---------------------------|
-| Get video information | Approximately 1-1.5 seconds (2-3 API calls) |
-| Get video comments | Approximately 1 second (2 API calls) |
-
-For video summarization use cases, this delay is **acceptable**:
-- Users typically summarize one video at a time
-- 1-2 second wait time is within normal range
-- Avoids the risk of being restricted and completely unavailable
-
-## Development
+## 🛠️ Development Guide
 
 ```bash
-# Watch mode compilation
-npm run watch
-```
-
-## License
-
-This project uses **GNU General Public License v3.0**.
-
-This license means:
-- Anyone can freely use, modify and distribute this software
-- Modified code must be open source under the same GPL-3.0 license
-- Prohibited from being used in closed-source commercial software (unless complete source code is provided)
-
-For the full license text, please see [LICENSE](./LICENSE) file.
-
-## Contribution and Feedback
-
-### Reporting Issues
-
-If you find any bugs or have improvement suggestions, please report them through:
-
-1. Check if a similar issue already exists
-2. Click the "New issue" button on the [Issues](https://github.com/365903728-oss/bilibili-mcp/issues) page
-3. Select an appropriate template (Bug report or Feature request)
-4. Fill in the details including:
-   - Description of the issue
-   - Steps to reproduce
-   - Operating system and tool version used
-   - Any relevant error messages or screenshots
-
-### Submitting Pull Requests
-
-We welcome contributions from the community:
-
-1. Fork the project
-2. Create a new branch
-3. Make your changes
-4. Test your changes
-5. Submit a Pull Request
-
-### Development Environment Setup
-
-```bash
-# Clone the repository
 git clone https://github.com/365903728-oss/bilibili-mcp.git
-
-# Install dependencies
 cd bilibili-mcp
 npm install
-
-# Start development server
 npm run watch
 ```
 
 ---
 
-## Disclaimer
+## ⚖️ Safety and Disclaimer
 
-> **Important Legal Notice: Please read these terms carefully before using this tool**
+- **Trademark**: Bilibili is a registered trademark of Bilibili Inc. This is a third-party open-source tool.
+- **Spirit**: For personal learning and research only. Commercial exploitation or large-scale scraping is prohibited.
+- **Liability**: Requests originate locally. Developers are not responsible for account restrictions.
+- **Privacy**: No back-end uploading; credentials stored locally.
 
-### Trademark Notice
-
-**Bilibili is a registered trademark of Bilibili Inc.** This project is a third-party open source tool and has no affiliation or cooperation with Bilibili Inc.
-
-### Non-Commercial Use Restrictions
-
-- This project is **for personal learning and research purposes only**
-- Commercial distribution or use in any form is strictly prohibited
-- Large-scale data collection or crawling behaviors are strictly prohibited
-- Integration of this tool into commercial products or services is strictly prohibited
-
-### Compliance Obligations
-
-When using this tool, you must comply with:
-- **Anti-Unfair Competition Law of the People's Republic of China**
-- Bilibili's service agreements and user agreements
-- Bilibili's API usage specifications
-
-### Responsibility
-
-- The developer is not responsible for any illegal operations performed by users using this tool
-- The developer is not responsible for account risks (including but not limited to account suspension, IP restrictions, etc.) caused by using this tool
-- The developer is not responsible for any legal consequences or economic losses that may result from using this tool
-- Users should bear all risks of using this tool independently
-
-### Other Notes
-
-1. **Respect Copyright** - Video subtitles, summaries and other content may be copyrighted, please do not spread them without authorization
-2. **Data Privacy** - This tool does not store, collect or transmit any user's private information
-3. **API Changes** - Bilibili may modify or close its API at any time, and this tool may not function properly as a result
-4. **Request Limits** - This tool has built-in rate limiting mechanisms, but please use it responsibly to avoid being restricted
+### License
+Open-sourced under **GNU General Public License v3.0**.

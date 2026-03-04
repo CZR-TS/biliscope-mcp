@@ -1,68 +1,106 @@
 # Bilibili MCP Tool
-用claude code(glm4.7模型)做的总结B站视频的MCP
 
-[English](./README_EN.md)(**Please read the README.md file**)
+[![npm version](https://img.shields.io/npm/v/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-MCP工具包括两个tools,视频总结和评论获取
+用claude code(glm4.7模型)做的总结B站视频的MCP(经过antigravity里的claude,gemini模型修改bug)(提取字幕与评论)
 
-Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。支持在 Claude Code、Cursor、Trae 等多种 MCP 兼容平台上使用。
-
+View this document in [English](./README_EN.md).
 
 ---
 
-## 功能特性
+## 📑 目录
+
+- [Bilibili MCP Tool](#bilibili-mcp-tool)
+  - [📑 目录](#-目录)
+  - [🌟 功能特性](#-功能特性)
+    - [1. 视频总结 (`get_video_info`)](#1-视频总结-get_video_info)
+    - [2. 评论总结 (`get_video_comments`)](#2-评论总结-get_video_comments)
+  - [📋 环境要求](#-环境要求)
+  - [🚀 安装方式](#-安装方式)
+    - [🖱️ Cursor](#️-cursor)
+    - [Claude Code](#claude-code)
+      - [方法一：通过 CLI 命令快速安装（推荐）](#方法一通过-cli-命令快速安装推荐)
+      - [方法二：通过配置文件手动添加（高级）](#方法二通过配置文件手动添加高级)
+      - [方法三：通过 npm 全局安装](#方法三通过-npm-全局安装)
+    - [🏗️ Trae (字节跳动官方 IDE)](#️-trae-字节跳动官方-ide)
+    - [🌊 Windsurf (Codeium 官方 IDE)](#-windsurf-codeium-官方-ide)
+    - [⚡ Zed](#-zed)
+    - [♊ Gemini CLI (Google 官方命令行工具)](#-gemini-cli-google-官方命令行工具)
+    - [⌨️ Codex CLI (OpenAI 官方命令行工具)](#️-codex-cli-openai-官方命令行工具)
+    - [🪐 Antigravity (Google 官方 IDE)](#-antigravity-google-官方-ide)
+    - [📦 OpenCode](#-opencode)
+  - [⚙️ 凭证配置](#️-凭证配置)
+    - [方式 A：使用 CLI 向导（推荐）](#方式-a使用-cli-向导推荐)
+    - [方式 B：手动配置环境变量](#方式-b手动配置环境变量)
+      - [🔒 安全须知](#-安全须知)
+  - [💡 工具使用示例](#-工具使用示例)
+  - [🛡️ API 限流机制](#️-api-限流机制)
+  - [🛠️ 开发指南](#️-开发指南)
+  - [⚖️ 安全性与免责声明](#️-安全性与免责声明)
+    - [许可证](#许可证)
+
+---
+
+## 🌟 功能特性
 
 ### 1. 视频总结 (`get_video_info`)
 - 优先获取视频的 CC 或 AI 字幕
 - 无字幕时自动降级为视频标题、简介和标签
 - 支持多语言字幕选择（默认优先简体中文）
-- 可手动指定偏好字幕语言
+- 可手动指定偏好字幕语言（如 `en`, `zh-Hant` 等）
 
 ### 2. 评论总结 (`get_video_comments`)
-- 获取视频热门评论
-- 自动过滤表情占位符（如 `[doge]`）
-- 优先保留包含时间戳的评论（如 `05:20`）
+- 获取视频热门评论，辅助判断视频真实口碑
+- 自动过滤表情占位符（如 `[doge]`）以保持文本整洁
+- 优先保留包含时间戳的评论（如 `05:20`），方便定位高能片段
 - 支持两种详细程度：
-  - `brief`: 10 条热门评论
-  - `detailed`: 50 条热门评论 + 高赞回复
+  - `brief`: 10 条热门评论速览
+  - `detailed`: 50 条热门评论 + 高赞连带回复
 
-## 安装方式
+---
+
+## 📋 环境要求
+
+- **Node.js**: v18.0.0 或更高版本
+- Bilibili 账号凭证 (Cookie)
+
+---
+
+## 🚀 安装方式
+
+### 🖱️ Cursor
+
+Cursor 同样原生支持 MCP，你可以通过图形界面快速添加：
+
+1. 打开 Cursor 设置：`Cursor Settings` > `Features` > `MCP Servers`
+2. 点击 **+ Add New MCP Server**
+3. 填写以下信息：
+   - **Name**: `bilibili-mcp` (或任意你喜欢的名字)
+   - **Type**: 选择 `command`
+   - **Command**: `npx -y @xzxzzx/bilibili-mcp` （如果 Windows 遇到路径问题，可尝试 `cmd /k npx -y @xzxzzx/bilibili-mcp`）
+4. 点击 **Add** 保存。配置完成后，可能需要点击列表旁的刷新按钮来加载工具库。
+
+> **提示**：高级用户也可直接在项目根目录创建 `.cursor/mcp.json` 配置文件。
 
 ### Claude Code
 
-#### 方法一：通过 npm 直接安装（推荐）
+#### 方法一：通过 CLI 命令快速安装（推荐）
 
-最简单的安装方式是直接通过 npm 全局安装：
+直接在终端运行以下命令：
 
 ```bash
-npm install -g @xzxzzx/bilibili-mcp
+claude mcp add bilibili-mcp --command "npx" --args "-y" --args "@xzxzzx/bilibili-mcp"
 ```
 
-安装完成后，你可以：
+完成后重启 Claude Code 即可使用。
 
-1. 检查是否安装成功：
-   ```bash
-   bilibili-mcp --help
-   ```
-
-2. 配置 Bilibili 凭证（首次使用时）：
-   ```bash
-   bilibili-mcp config
-   ```
-
-3. 检查配置状态：
-   ```bash
-   bilibili-mcp check
-   ```
-
-4. 直接在 Claude Code 中使用，无需额外配置
-
-#### 方法二：通过配置文件安装（适用于开发或自定义路径）
+#### 方法二：通过配置文件手动添加（高级）
 
 1. 打开 Claude Code 配置文件（通常在 `~/.claude.json`）
-2. 在 `mcpServers` 部分添加以下配置：
+2. 在 `mcpServers` 节点下添加：
 
-**使用 npx（推荐）：**
 ```json
 {
   "mcpServers": {
@@ -73,40 +111,158 @@ npm install -g @xzxzzx/bilibili-mcp
   }
 }
 ```
+3. 保存后重启 Claude Code。
 
-**本地开发模式：**
+#### 方法三：通过 npm 全局安装
+
+安装后可直接使用命令行工具管理配置：
+
+```bash
+npm install -g @xzxzzx/bilibili-mcp
+```
+
+安装验证与检查：
+1. `bilibili-mcp --help` （查看帮助）
+2. `bilibili-mcp config` （通过交互向导配置 Cookie）
+3. `bilibili-mcp check` （检查配置状态）
+
+### 🏗️ Trae (字节跳动官方 IDE)
+
+Trae 提供了非常便捷的 MCP 接入界面，国内/国际版操作一致：
+
+1. 打开 Trae 设置：点击左下角齿轮 -> **Settings** (或 `Cmd/Ctrl + ,`)。
+2. 找到 **AI** 选项卡 -> **MCP**。
+3. 点击 **Add Server** 按钮。
+4. 在弹出窗口中填写：
+   - **Name**: `bilibili-mcp`
+   - **Type**: 选择 `command` (stdio)
+   - **Command**: `npx`
+   - **Arguments**: `["-y", "@xzxzzx/bilibili-mcp"]`
+5. 点击 **Save**。
+
+> **提示**：Trae 也会自动识别项目根目录下的 `.trae/mcp_config.json` 文件。
+
+### 🌊 Windsurf (Codeium 官方 IDE)
+
+Windsurf 同样支持通过标准 JSON 配置文件接入：
+
+1. 打开 Windsurf 设置：`Cmd/Ctrl + ,` -> 在左侧点击 **Advanced** -> **Cascade**。
+2. 点击 **Add custom server +** 或 **View raw config**（这将打开 `mcp_config.json`）。
+3. 如果是手动编辑，文件路径通常为：
+   - Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
+   - macOS/Linux: `~/.codeium/windsurf/mcp_config.json`
+4. 在 `mcpServers` 节点下添加：
 ```json
 {
   "mcpServers": {
     "bilibili-mcp": {
-      "command": "node",
-      "args": ["/path/to/bilibili-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
     }
   }
 }
 ```
+5. 保存并重启 Windsurf 后，在 Cascade 面板即可看到新添加的工具。
 
-3. 保存配置文件
-4. 重启 Claude Code 使配置生效
+### ⚡ Zed
 
-#### 方法三：通过 CLI 命令安装（最简单）
+Zed 编辑器通过 `settings.json` 配置文件中的 `context_servers` 字段来支持 MCP：
 
-直接运行以下命令：
+1. 打开 Zed 的设置文件：`Cmd + ,` (macOS) 或 `Ctrl + ,` (Windows/Linux)。
+2. 在 JSON 配置文件中添加 (或修改) `context_servers` 节点：
 
+```json
+{
+  "context_servers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. 保存文件。Zed 桌面端会自动重启 Context Server。
+4. 在编辑器中通过 `/` 触发 AI 辅助时，可以看到来自该服务器的 Context 或工具。
+
+### ♊ Gemini CLI (Google 官方命令行工具)
+
+Gemini CLI 通过全局或项目级的 `settings.json` 文件管理 MCP 服务器：
+
+1. 找到全局配置文件：
+   - Windows: `%USERPROFILE%\.gemini\settings.json`
+   - macOS/Linux: `~/.gemini/settings.json`
+2. 在 `mcpServers` 节点下添加：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. 如果您是通过项目级配置，请在项目根目录创建 `.gemini/settings.json`。
+4. 保存后，运行 `gemini` 命令时即可调用相关工具。
+
+> **国内版提示**：如果您在国内环境下使用，请确保已正确配置 `HTTP_PROXY` 或 `HTTPS_PROXY` 环境变量，以便 `npx` 顺利下载包以及 CLI 能够访问 Google API。
+
+### ⌨️ Codex CLI (OpenAI 官方命令行工具)
+
+Codex CLI 使用 TOML 格式的配置文件，并支持通过命令行快速添加：
+
+**方式一：通过命令行添加（推荐）**
+直接在终端运行：
 ```bash
-claude mcp add bilibili-mcp npx -y @xzxzzx/bilibili-mcp
+codex mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp
 ```
 
-然后重启 Claude Code 即可。
+**方式二：手动修改配置文件**
+1. 找到配置文件：
+   - 全局路径：`~/.codex/config.toml`
+   - 项目路径：`.codex/config.toml`
+2. 添加以下内容：
 
-### OpenCode
+```toml
+[mcp_servers.bilibili-mcp]
+command = "npx"
+args = ["-y", "@xzxzzx/bilibili-mcp"]
+```
+保存后重启 Codex CLI 即可识别工具。
 
-OpenCode 是一个开源的 AI 代码编辑器，同样支持 MCP 协议。
+### 🪐 Antigravity (Google 官方 IDE)
 
-#### 方法一：通过配置文件安装
+Antigravity 原生支持 MCP 协议。你可以通过 UI 界面或直接修改配置文件来添加：
 
-1. 创建或编辑 OpenCode 配置文件（位于 `~/.config/opencode/opencode.json`）
-2. 在 `mcp` 部分添加以下配置：
+**方式一：通过界面添加（推荐）**
+1. 在编辑器侧边栏顶部点击 `...` 下拉菜单，打开 **MCP Store** 面板。
+2. 点击 **Manage MCP Servers -> View raw config**。
+3. 参考下方 JSON 格式填入配置。
+
+**方式二：手动修改配置文件**
+- Windows 路径：`%USERPROFILE%\.gemini\antigravity\mcp_config.json`
+- macOS/Linux 路径：`~/.gemini/antigravity/mcp_config.json`
+
+在 `mcpServers` 节点下添加：
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+保存后配置即刻生效。
+
+### 📦 OpenCode
+
+OpenCode 用户可以通过编辑配置文件接入：
+
+1. 编辑 `~/.config/opencode/opencode.json`
+2. 在 `mcp` 节点下添加以下内容：
 
 ```json
 {
@@ -121,269 +277,102 @@ OpenCode 是一个开源的 AI 代码编辑器，同样支持 MCP 协议。
 }
 ```
 
-3. 保存配置文件
-4. 重启 OpenCode 使配置生效
+---
 
-#### 方法二：本地开发模式
+## ⚙️ 凭证配置
 
-如果你想在本地开发模式下使用：
+为了获取更完整的评论数据或避免匿名访问限制，建议配置 B 站 Cookie。
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "bilibili-mcp": {
-      "type": "local",
-      "command": ["node", "/path/to/bilibili-mcp/dist/index.js"],
-      "enabled": true
-    }
-  }
-}
+### 方式 A：使用 CLI 向导（推荐）
+如果您全局安装了 npm 包，直接运行：
+```bash
+bilibili-mcp config
 ```
+交互向导将引导您输入凭证并安全保存在**本地**配置目录（`~/.bilibili-mcp/config.json`）中，**不会被上传至任何服务器**。
 
-### 环境变量配置
+### 方式 B：手动配置环境变量
 
-1. 复制 `.env.example` 文件为 `.env`：
-   ```bash
-   cp .env.example .env
-   ```
-2. 打开 `.env` 文件，根据需要配置以下变量：
-   - `BILI_JCT`：Bilibili 登录凭证（可选，用于获取评论）
-   - `SESSDATA`：Bilibili 会话数据（可选，用于获取评论）
-   - `BUVID3`：Bilibili 设备标识（可选）
+在项目根目录创建 `.env` 文件（或在 shell 中设置），手动填入以下变量：
 
-**注意**：这些变量通常可以从浏览器的开发者工具中获取（Cookie 存储）。
+| 变量名 | 说明 |
+| :--- | :--- |
+| **BILIBILI_SESSDATA** | 会话数据 (SESSDATA) |
+| **BILIBILI_BILI_JCT** | 跨站令牌 (bili_jct) |
+| **BILIBILI_DEDEUSERID** | 用户 ID (DedeUserID) |
 
-#### 🔒 安全提示
+<details>
+<summary>💡 点击查看如何获取 Bilibili Cookie</summary>
 
-- **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
+1. 在电脑浏览器登录 [bilibili.com](https://www.bilibili.com)
+2. 按 `F12` 打开开发者工具（或在页面右键选择“检查”）。
+3. 切换到 **Application (应用)** 选项卡 -> 在左侧菜单找到 **Cookies** -> 点击 `https://www.bilibili.com`。
+4. 在右侧列表中找到 `SESSDATA`、`bili_jct` 和 `buvid3`，复制其对应的 **Value** 即可。
+</details>
 
-- **请勿分享您的 .env 文件或 Cookie 值**
+#### 🔒 安全须知
 
-- Cookie 定期会过期，需要重新获取
+- **本地存储**：您的凭证信息（Cookie）仅存储在您的本地设备上（环境变量或本地配置文件），本工具**绝不会**将其上传至除 Bilibili 官方 API 以外的任何第三方服务器。
+- **配置隔离**：`.env` 文件已被 `.gitignore` 排除，**请勿手动提交到公开代码库**。
+- **时效性**：Cookie 具有时效性，若遇到权限错误请考虑重新获取并配置。
 
-  #### 🔒 安全提示
+---
 
-  - **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
-  - **请勿分享您的 .env 文件或 Cookie 值**
-  - Cookie 定期会过期，需要重新获取
-  - 建议使用小号或测试账号的 Cookie
+## 💡 工具使用示例
 
-## 工具使用示例
+在支持 MCP 的对话流中，你可以直接输入自然语言，底层会自动调用对应的 JSON 格式配置：
 
-### 获取视频信息（含字幕）
 ```json
+// 获取默认语言视频信息
 {
   "name": "get_video_info",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx"
-  }
+  "arguments": { "bvid_or_url": "BV1xx4x1x7xx" }
 }
-```
 
-### 获取视频信息（指定语言）
-
-```json
-{
-  "name": "get_video_info",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "preferred_lang": "en"
-  }
-}
-```
-
-### 获取评论（简略模式）
-
-```json
+// 获取 10 条简短评估
 {
   "name": "get_video_comments",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "detail_level": "brief"
-  }
+  "arguments": { "bvid_or_url": "BV1xx4x1x7xx", "detail_level": "brief" }
 }
-```
-
-### 获取评论（详细模式）
-
-```json
-{
-  "name": "get_video_comments",
-  "arguments": {
-    "bvid_or_url": "BV1xx4x1x7xx",
-    "detail_level": "detailed"
-  }
-}
-```
-
-## 返回数据格式
-
-### 视频信息返回格式
-
-```json
-{
-  "data_source": "subtitle",
-  "video_info": {
-    "title": "视频标题",
-    "description": "视频简介",
-    "tags": ["标签1", "标签2"],
-    "subtitle_text": "字幕内容..."
-  }
-}
-```
-
-当 `data_source` 为 `description` 时，表示没有字幕，只有基本信息。
-
-### 评论返回格式
-
-```json
-{
-  "comments": [
-    {
-      "author": "用户名",
-      "content": "评论内容",
-      "likes": 123,
-      "has_timestamp": true,
-      "timestamp": "05:20"
-    }
-  ],
-  "summary": {
-    "total_comments": 50,
-    "comments_with_timestamp": 5
-  }
-}
-```
-
-## 安全性
-
-- ✅ 使用 Bilibili 公开 API
-- ✅ 敏感信息（Cookie）通过环境变量配置，不会提交到代码仓库
-- ✅ 不存储任何用户数据
-- ✅ 代码开源可审计
-- ✅ 错误输出使用 `console.error` 避免干扰 Stdio 协议
-- ⚠️ 用户需自行配置 B 站 Cookie（存储在本地 .env 文件中）
-
-## API 限流机制
-
-为了遵守 Bilibili 的 API 使用规范并防止被限制，本工具实现了请求限流机制：
-
-### 限流配置
-
-| 配置项 | 值 |
-|--------|-----|
-| 请求间隔 | 500ms（0.5 秒） |
-| 请求方式 | 队列顺序执行，不并发 |
-
-### 为什么需要限流
-
-1. **遵守 Bilibili API 规范** - 避免高频请求导致账号或 IP 被限制
-2. **保证稳定性** - 降低 API 返回错误或被拒绝的风险
-3. **尊重服务提供方** - 合理使用公共资源
-
-### 对用户的影响
-
-| 操作 | 预计额外延迟 |
-|------|-------------|
-| 获取视频信息 | 约 1-1.5 秒（2-3 个 API 调用） |
-| 获取视频评论 | 约 1 秒（2 个 API 调用） |
-
-对于视频总结的使用场景，这个延迟是**可接受**的，因为：
-- 用户通常一次只总结一个视频
-- 1-2 秒的等待时间在正常范围内
-- 避免被限流后完全无法使用的风险
-
-## 开发
-
-```bash
-# 监听模式编译
-npm run watch
-```
-
-## 许可证
-
-本项目采用 **GNU General Public License v3.0** 许可证。
-
-此许可证意味着：
-- 任何人都可以自由使用、修改和分发本软件
-- 修改后的代码必须以相同的 GPL-3.0 许可证开源
-- 禁止将代码用于闭源商业软件中（除非提供完整源代码）
-
-完整的许可证文本请参见 [LICENSE](./LICENSE) 文件。
-
-## 贡献与反馈
-
-### 报告问题
-
-如果您发现任何错误或有改进建议，请通过以下方式报告：
-
-1. 检查是否已存在类似问题
-2. 点击 [Issues](https://github.com/365903728-oss/bilibili-mcp/issues) 页面上的 "New issue" 按钮
-3. 选择适当的模板（Bug 报告或功能请求）
-4. 填写详细信息，包括：
-   - 遇到的问题描述
-   - 复现步骤
-   - 使用的操作系统和工具版本
-   - 任何相关的错误信息或截图
-
-### 提交 Pull Request
-
-我们欢迎社区贡献代码：
-
-1. Fork 项目
-2. 创建一个新分支
-3. 进行您的修改
-4. 测试您的修改
-5. 提交 Pull Request
-
-### 开发环境设置
-
-```bash
-# 克隆仓库
-git clone https://github.com/365903728-oss/bilibili-mcp.git
-
-# 安装依赖
-cd bilibili-mcp
-npm install
-
-# 启动开发服务器
-npm run watch
 ```
 
 ---
 
-## 免责声明
+## 🛡️ API 限流机制
 
-> **重要法律声明：使用本工具前请仔细阅读以下条款**
+为保证工具长效可用并合规调用底层接口，已内置以下限流策略：
 
-### 商标声明
+- **请求间隔**：500ms（0.5秒）
+- **执行方式**：加入队列顺序处理，禁止大并发请求。
 
-**Bilibili (哔哩哔哩) 是哔哩哔哩公司的注册商标**，本项目为第三方开源工具，与哔哩哔哩公司无任何关联或合作关系。
+---
 
-### 非商业用途限制
+## 🛠️ 开发指南
 
-- 本项目**仅供个人学习和研究使用**
-- 严禁用于任何形式的商业分发或商业用途
-- 严禁用于大规模数据采集或爬虫行为
-- 严禁将本工具集成到商业产品或服务中
+```bash
+# 1. 克隆仓库
+git clone https://github.com/365903728-oss/bilibili-mcp.git
+cd bilibili-mcp
 
-### 合规义务
+# 2. 安装依赖包
+npm install
 
-使用本工具时，您必须遵守：
-- **《中华人民共和国反不正当竞争法》**
-- Bilibili 的服务协议和用户协议
-- Bilibili 的 API 使用规范
+# 3. 启动监听与实时编译
+npm run watch
+```
 
-### 责任自负
+本工具输出报错信息统一使用 `console.error`，以避免干扰 Stdio 协议数据。
 
-- 开发者不对用户利用本工具进行的任何违规操作负责
-- 开发者不对因使用本工具导致的账号风险（包括但不限于账号封禁、IP 限制等）负责
-- 开发者不对因使用本工具可能产生的任何法律后果或经济损失负责
-- 用户应独立承担使用本工具的一切风险
+---
 
-### 其他注意事项
+## ⚖️ 安全性与免责声明
 
-1. **尊重版权** - 视频字幕、总结等内容可能受版权保护，请勿擅自传播
-2. **数据隐私** - 本工具不存储、收集或传输任何用户的私密信息
-3. **API 变更** - Bilibili 可能随时修改或关闭其 API，本工具可能因此无法正常工作
-4. **请求限制** - 本工具已内置限流机制，但仍请合理使用，避免被限制
+> **⚠️ 重要：使用本工具即代表您同意以下条款**
+
+- **商标声明**：Bilibili (哔哩哔哩) 是哔哩哔哩公司的注册商标。本项目为基于公开协议的第三方开源辅助工具。
+- **协议精神**：本项目**仅供个人学习、辅助阅读使用**。坚决抵制任何用于商业剥削、大规模滥用抓取等违规操作。
+- **责任归属**：所有请求均为用户本地发起。开发者不对由于高频使用等原因导致的账号风控或其他后果负责。
+- **隐私保护**：本工具严格保护用户隐私，所有凭证信息仅在本地加密/非加密存储，除与 Bilibili 官方接口通信外，无任何后台上传行为。
+
+### 许可证
+
+基于 **GNU General Public License v3.0** 开源。
