@@ -7,7 +7,7 @@
 用claude code(glm4.7模型)做的总结B站视频的MCP(经过antigravity里的claude,gemini模型修改bug)(提取字幕与评论)
 
 > [!TIP]
-> ⚠️ **快速开始**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)。
+> ⚠️ **提示**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)(凭证只会保存在本地，不会上传到任何地方)。
 
 View this document in [English](./README_EN.md).
 
@@ -27,6 +27,7 @@ View this document in [English](./README_EN.md).
     - [Claude Code](#claude-code)
       - [方法一：通过 CLI 命令快速安装（推荐）](#方法一通过-cli-命令快速安装推荐)
       - [方法二：通过配置文件手动添加（高级）](#方法二通过配置文件手动添加高级)
+    - [Claude Desktop (桌面客户端)](#claude-desktop-桌面客户端)
       - [方法三：通过 npm 全局安装](#方法三通过-npm-全局安装)
     - [🏗️ Trae (字节跳动官方 IDE)](#️-trae-字节跳动官方-ide)
     - [🌊 Windsurf (Codeium 官方 IDE)](#-windsurf-codeium-官方-ide)
@@ -128,6 +129,28 @@ claude mcp add bilibili-mcp --command "npx" --args "-y" --args "@xzxzzx/bilibili
 }
 ```
 3. 保存后重启 Claude Code。
+
+### Claude Desktop (桌面客户端)
+
+Claude Desktop 支持通过全局配置文件接入 MCP 服务器：
+
+1. 打开 Claude Desktop 配置文件：
+   - Windows 路径：`%APPDATA%\Claude\claude_desktop_config.json`
+   - macOS 路径：`~/Library/Application Support/Claude/claude_desktop_config.json`
+   - *提示：您也可以在 Claude Desktop 的 **Settings** -> **Developer** 中点击 **Edit Config** 直接打开该文件。*
+2. 在 `mcpServers` 节点下添加：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. 保存文件并从侧边栏重启或重新开启对话。
 
 #### 方法三：通过 npm 全局安装
 

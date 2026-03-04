@@ -7,7 +7,7 @@
 A Bilibili video auxiliary MCP tool built based on mainstream AI development tools like Claude Code, Cursor, Trae, and Google Antigravity. It aims to quickly extract core video information, highlights, and popular comments through Large Language Model capabilities, helping you process audio and video content efficiently.
 
 > [!TIP]
-> ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration).
+> ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration)(Cookies are only stored locally and will not be uploaded anywhere).
 
 View this document in [简体中文](./README.md).
 
@@ -15,23 +15,38 @@ View this document in [简体中文](./README.md).
 
 ## 📑 Table of Contents
 
-- [🌟 Features](#🌟-features)
-- [📋 Requirements](#📋-requirements)
-- [🚀 Installation](#🚀-installation)
-  - [Cursor](#cursor)
-  - [Claude Code](#claude-code)
-  - [Trae](#trae-official-ide-by-bytedance)
-  - [Windsurf](#windsurf-official-ide-by-codeium)
-  - [Zed](#zed)
-  - [Gemini CLI](#gemini-cli-official-google-cli)
-  - [Codex CLI](#codex-cli-official-openai-cli)
-  - [Antigravity](#antigravity-official-google-ide)
-  - [OpenCode](#opencode)
-- [⚙️ Credential Configuration](#⚙️-credential-configuration)
-- [💡 Usage Examples](#💡-usage-examples)
-- [🛡️ API Rate Limiting](#🛡️-api-rate-limiting)
-- [🛠️ Development Guide](#🛠️-development-guide)
-- [⚖️ Safety and Disclaimer](#⚖️-safety-and-disclaimer)
+- [Bilibili MCP Tool](#bilibili-mcp-tool)
+  - [📑 Table of Contents](#-table-of-contents)
+  - [⚡ Pre-check](#-pre-check)
+  - [🌟 Features](#-features)
+    - [1. Video Summarization (`get_video_info`)](#1-video-summarization-get_video_info)
+    - [2. Comment Summarization (`get_video_comments`)](#2-comment-summarization-get_video_comments)
+  - [📋 Requirements](#-requirements)
+  - [🚀 Installation](#-installation)
+    - [🖱️ Cursor](#️-cursor)
+    - [Claude Code](#claude-code)
+      - [Method 1: Fast Installation via CLI (Recommended)](#method-1-fast-installation-via-cli-recommended)
+      - [Method 2: Manual Addition via Config File](#method-2-manual-addition-via-config-file)
+    - [Claude Desktop](#claude-desktop)
+      - [Method 3: Global npm Installation](#method-3-global-npm-installation)
+    - [🏗️ Trae (Official IDE by ByteDance)](#️-trae-official-ide-by-bytedance)
+    - [🌊 Windsurf (Official IDE by Codeium)](#-windsurf-official-ide-by-codeium)
+    - [⚡ Zed](#-zed)
+    - [♊ Gemini CLI (Official Google CLI)](#-gemini-cli-official-google-cli)
+    - [⌨️ Codex CLI (Official OpenAI CLI)](#️-codex-cli-official-openai-cli)
+    - [🪐 Antigravity (Official Google IDE)](#-antigravity-official-google-ide)
+    - [📦 OpenCode](#-opencode)
+  - [⚙️ Credential Configuration](#️-credential-configuration)
+    - [🔑 Step 1: Obtain Bilibili Cookies](#-step-1-obtain-bilibili-cookies)
+    - [📝 Step 2: Apply Credentials](#-step-2-apply-credentials)
+      - [Method A: CLI Wizard (Recommended, for global installations)](#method-a-cli-wizard-recommended-for-global-installations)
+      - [Method B: Manual Environment Variables (for local development or Docker)](#method-b-manual-environment-variables-for-local-development-or-docker)
+      - [🔒 Security Notice](#-security-notice)
+  - [💡 Usage Examples](#-usage-examples)
+  - [🛡️ API Rate Limiting](#️-api-rate-limiting)
+  - [🛠️ Development Guide](#️-development-guide)
+  - [⚖️ Safety and Disclaimer](#️-safety-and-disclaimer)
+    - [License](#license)
 
 ---
 
@@ -114,6 +129,28 @@ Restart Claude Code after completion.
 }
 ```
 3. Save and restart Claude Code.
+
+### Claude Desktop
+
+Claude Desktop supports MCP servers via a global configuration file:
+
+1. Open the Claude Desktop configuration file:
+   - Windows Path: `%APPDATA%\Claude\claude_desktop_config.json`
+   - macOS Path: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - *Tip: You can also open this file by clicking **Edit Config** in **Settings** -> **Developer** within Claude Desktop.*
+2. Add the following to the `mcpServers` node:
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+3. Save the file and restart Claude Desktop or start a new conversation to load the tools.
 
 #### Method 3: Global npm Installation
 
