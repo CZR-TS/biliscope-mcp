@@ -6,6 +6,9 @@
 
 用claude code(glm4.7模型)做的总结B站视频的MCP(经过antigravity里的claude,gemini模型修改bug)(提取字幕与评论)
 
+> [!TIP]
+> ⚠️ **快速开始**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)。
+
 View this document in [English](./README_EN.md).
 
 ---
@@ -14,6 +17,7 @@ View this document in [English](./README_EN.md).
 
 - [Bilibili MCP Tool](#bilibili-mcp-tool)
   - [📑 目录](#-目录)
+  - [⚡ 快速预检](#-快速预检)
   - [🌟 功能特性](#-功能特性)
     - [1. 视频总结 (`get_video_info`)](#1-视频总结-get_video_info)
     - [2. 评论总结 (`get_video_comments`)](#2-评论总结-get_video_comments)
@@ -32,14 +36,26 @@ View this document in [English](./README_EN.md).
     - [🪐 Antigravity (Google 官方 IDE)](#-antigravity-google-官方-ide)
     - [📦 OpenCode](#-opencode)
   - [⚙️ 凭证配置](#️-凭证配置)
-    - [方式 A：使用 CLI 向导（推荐）](#方式-a使用-cli-向导推荐)
-    - [方式 B：手动配置环境变量](#方式-b手动配置环境变量)
+    - [🔑 第一步：获取 Bilibili Cookie](#-第一步获取-bilibili-cookie)
+    - [📝 第二步：应用凭证](#-第二步应用凭证)
+      - [方式 A：使用 CLI 向导（推荐，适用于全局安装）](#方式-a使用-cli-向导推荐适用于全局安装)
+      - [方式 B：手动配置环境变量（适用于本地开发或 Docker）](#方式-b手动配置环境变量适用于本地开发或-docker)
       - [🔒 安全须知](#-安全须知)
   - [💡 工具使用示例](#-工具使用示例)
   - [🛡️ API 限流机制](#️-api-限流机制)
   - [🛠️ 开发指南](#️-开发指南)
   - [⚖️ 安全性与免责声明](#️-安全性与免责声明)
     - [许可证](#许可证)
+
+---
+
+## ⚡ 快速预检
+
+> [!IMPORTANT]
+> **本工具需要 Bilibili 凭证 (Cookie) 才能发挥完整功能。**
+> 如果没有正确配置凭证，您可能无法获取视频字幕、评论
+
+在开始安装前，请确保您已经了解[如何获取并配置 Cookie](#️-凭证配置)。
 
 ---
 
@@ -279,41 +295,53 @@ OpenCode 用户可以通过编辑配置文件接入：
 
 ---
 
+---
+
 ## ⚙️ 凭证配置
 
-为了获取更完整的评论数据或避免匿名访问限制，建议配置 B 站 Cookie。
+为了获取更完整的评论数据、绕过匿名访问限制并确保工具稳定运行，**必须**配置 B 站 Cookie。
 
-### 方式 A：使用 CLI 向导（推荐）
-如果您全局安装了 npm 包，直接运行：
-```bash
-bilibili-mcp config
-```
-交互向导将引导您输入凭证并安全保存在**本地**配置目录（`~/.bilibili-mcp/config.json`）中，**不会被上传至任何服务器**。
-
-### 方式 B：手动配置环境变量
-
-在项目根目录创建 `.env` 文件（或在 shell 中设置），手动填入以下变量：
-
-| 变量名 | 说明 |
-| :--- | :--- |
-| **BILIBILI_SESSDATA** | 会话数据 (SESSDATA) |
-| **BILIBILI_BILI_JCT** | 跨站令牌 (bili_jct) |
-| **BILIBILI_DEDEUSERID** | 用户 ID (DedeUserID) |
-
-<details>
-<summary>💡 点击查看如何获取 Bilibili Cookie</summary>
+### 🔑 第一步：获取 Bilibili Cookie
 
 1. 在电脑浏览器登录 [bilibili.com](https://www.bilibili.com)
 2. 按 `F12` 打开开发者工具（或在页面右键选择“检查”）。
 3. 切换到 **Application (应用)** 选项卡 -> 在左侧菜单找到 **Cookies** -> 点击 `https://www.bilibili.com`。
-4. 在右侧列表中找到 `SESSDATA`、`bili_jct` 和 `buvid3`，复制其对应的 **Value** 即可。
-</details>
+4. 在右侧列表中找到以下三个关键变量，并记录它们的 **Value**：
+    - `SESSDATA`
+    - `bili_jct` (即 CSRF Token)
+    - `DedeUserID` (您的用户数字 ID)
+
+> [!TIP]
+> 如果您在 `Application` 找不到，也可以查看 `Network` (网络) 选项卡中的任意一个请求，在 `Headers` -> `Cookie` 字段中也能找到这些值。
+
+### 📝 第二步：应用凭证
+
+您可以针对不同的使用习惯选择以下任一方式：
+
+#### 方式 A：使用 CLI 向导（推荐，适用于全局安装）
+如果您全局安装了 npm 包（`npm i -g @xzxzzx/bilibili-mcp`），直接运行：
+```bash
+bilibili-mcp config
+```
+交互向导将引导您输入凭证并安全保存在**本地**配置目录（`~/.bilibili-mcp/config.json`）中。
+
+#### 方式 B：手动配置环境变量（适用于本地开发或 Docker）
+在项目根目录创建 `.env` 文件，手动填入以下变量：
+
+| 变量名 | 说明 |
+| :--- | :--- |
+| **BILIBILI_SESSDATA** | `SESSDATA` 的值 |
+| **BILIBILI_BILI_JCT** | `bili_jct` 的值 |
+| **BILIBILI_DEDEUSERID** | `DedeUserID` 的值 |
+
+> [!WARNING]
+> `.env` 文件仅供本地加载，**切勿提交到 Git 或公开仓库**。
 
 #### 🔒 安全须知
 
-- **本地存储**：您的凭证信息（Cookie）仅存储在您的本地设备上（环境变量或本地配置文件），本工具**绝不会**将其上传至除 Bilibili 官方 API 以外的任何第三方服务器。
-- **配置隔离**：`.env` 文件已被 `.gitignore` 排除，**请勿手动提交到公开代码库**。
-- **时效性**：Cookie 具有时效性，若遇到权限错误请考虑重新获取并配置。
+- **隐私保护**：您的凭证信息仅存储在您的本地设备上。本工具**绝不会**将其上传至除 Bilibili 官方 API 以外的任何第三方服务器。
+- **配置隔离**：`.env` 文件已被 `.gitignore` 排除。
+- **时效性**：Cookie 具有时效性。若遇到 `412` 或权限错误，请尝试更新 Cookie。
 
 ---
 

@@ -6,6 +6,9 @@
 
 A Bilibili video auxiliary MCP tool built based on mainstream AI development tools like Claude Code, Cursor, Trae, and Google Antigravity. It aims to quickly extract core video information, highlights, and popular comments through Large Language Model capabilities, helping you process audio and video content efficiently.
 
+> [!TIP]
+> ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration).
+
 View this document in [简体中文](./README.md).
 
 ---
@@ -29,6 +32,16 @@ View this document in [简体中文](./README.md).
 - [🛡️ API Rate Limiting](#🛡️-api-rate-limiting)
 - [🛠️ Development Guide](#🛠️-development-guide)
 - [⚖️ Safety and Disclaimer](#⚖️-safety-and-disclaimer)
+
+---
+
+## ⚡ Pre-check
+
+> [!IMPORTANT]
+> **This tool requires Bilibili Credentials (Cookies) to function fully.**
+> Without proper credentials, you may face issues retrieving subtitles, popular comments, or encounter frequent API rate limiting.
+
+Before proceeding with installation, please ensure you are familiar with [How to obtain and configure Cookies](#⚙️-credential-configuration).
 
 ---
 
@@ -258,39 +271,52 @@ Edit the config file:
 
 ---
 
+---
+
 ## ⚙️ Credential Configuration
 
-Configure Bilibili Cookies for full comment data and to avoid anonymous limits.
+To retrieve full comment data, bypass anonymous access limits, and ensure stability, you **must** configure Bilibili Cookies.
 
-### Method A: CLI Wizard (Recommended)
-If installed via npm, run:
+### 🔑 Step 1: Obtain Bilibili Cookies
+
+1. Log in to [bilibili.com](https://www.bilibili.com) in your desktop browser.
+2. Press `F12` to open Developer Tools (or right-click and select "Inspect").
+3. Go to the **Application** tab -> Find **Cookies** in the left menu -> Click `https://www.bilibili.com`.
+4. Locate the following three key variables and record their **Value**:
+    - `SESSDATA`
+    - `bili_jct` (also known as CSRF Token)
+    - `DedeUserID` (your numerical User ID)
+
+> [!TIP]
+> If you can't find them in the `Application` tab, check the `Network` tab for any request, and look for the `Cookie` field under `Headers`.
+
+### 📝 Step 2: Apply Credentials
+
+Choose one of the following methods based on your preference:
+
+#### Method A: CLI Wizard (Recommended, for global installations)
+If installed via npm (`npm i -g @xzxzzx/bilibili-mcp`), run:
 ```bash
 bilibili-mcp config
 ```
-This wizard will guide you to enter credentials and save them **locally** (`~/.bilibili-mcp/config.json`). They are **never uploaded to any server**.
+The interactive wizard will guide you through entering credentials and save them **locally** (`~/.bilibili-mcp/config.json`).
 
-### Method B: Manual Environment Variables
-Create a `.env` file in the project root (or set in shell):
+#### Method B: Manual Environment Variables (for local development or Docker)
+Create a `.env` file in the project root and enter the following variables:
 
 | Variable | Description |
 | :--- | :--- |
-| **BILIBILI_SESSDATA** | Session Data (SESSDATA) |
-| **BILIBILI_BILI_JCT** | CSRF Token (bili_jct) |
-| **BILIBILI_DEDEUSERID** | User ID (DedeUserID) |
+| **BILIBILI_SESSDATA** | Value of `SESSDATA` |
+| **BILIBILI_BILI_JCT** | Value of `bili_jct` |
+| **BILIBILI_DEDEUSERID** | Value of `DedeUserID` |
 
-<details>
-<summary>💡 How to get Bilibili Cookies</summary>
-
-1. Login to [bilibili.com](https://www.bilibili.com) in your browser.
-2. Press `F12` for Developer Tools.
-3. Go to **Application** tab -> **Cookies** -> `https://www.bilibili.com`.
-4. Copy values for `SESSDATA`, `bili_jct`, and `DedeUserID`.
-</details>
+> [!WARNING]
+> The `.env` file is for local use only. **Never commit it to Git or any public repository.**
 
 #### 🔒 Security Notice
-- **Local Storage**: Your credentials are only stored on your local device.
-- **Config Isolation**: `.env` is ignored by git. **Do not commit it to public repos**.
-- **Expiration**: Cookies expire; re-acquire them if you encounter permission errors.
+- **Privacy**: Your credentials are only stored on your local device. This tool **never** uploads them to any third-party server besides official Bilibili APIs.
+- **Isolation**: The `.env` file is excluded by `.gitignore`.
+- **Expiration**: Cookies expire over time. If you encounter `412` or permission errors, try updating your cookies.
 
 ---
 
