@@ -453,7 +453,19 @@ export async function getVideoInfo(bvid: string) {
  */
 export async function getVideoSubtitle(bvid: string, cid: number) {
   const authHeaders = credentialManager.getAuthHeaders();
-  return fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, authHeaders) as Promise<{
+
+  // 获取 buvid 指纹 Cookie，规避 B站近期将 -352 风控扩展到播放器接口的问题
+  const buvidFingerprint = await getBuvid();
+  const headersWithBuvid: Record<string, string> = { ...authHeaders };
+  if (buvidFingerprint) {
+    const existingCookie = headersWithBuvid['Cookie'] || '';
+    const buvidCookie = `buvid3=${buvidFingerprint.buvid3}; buvid4=${buvidFingerprint.buvid4}`;
+    headersWithBuvid['Cookie'] = existingCookie
+      ? `${existingCookie}; ${buvidCookie}`
+      : buvidCookie;
+  }
+
+  return fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, headersWithBuvid) as Promise<{
     subtitle: {
       subtitles: Array<{
         id: number;
