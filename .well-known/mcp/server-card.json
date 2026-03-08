@@ -1,0 +1,43 @@
+{
+  "tools": [
+    {
+      "name": "get_video_info",
+      "description": "获取 Bilibili 视频信息，优先返回字幕内容，如无字幕则返回视频简介和标签。支持指定偏好语言。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bvid_or_url": {
+            "type": "string",
+            "description": "Bilibili 视频 BV 号或完整 URL"
+          },
+          "preferred_lang": {
+            "type": "string",
+            "description": "可选参数，指定偏好字幕语言代码，如 'zh-Hans', 'zh-Hant', 'en' 等。默认按 zh-Hans -> zh-Hant -> en 顺序选择。"
+          }
+        },
+        "required": ["bvid_or_url"]
+      }
+    },
+    {
+      "name": "get_video_comments",
+      "description": "获取 Bilibili 视频热门评论。过滤表情占位符，优先保留包含时间戳的评论（如 '05:20'）。支持 brief（10条）和 detailed（50条+回复）两种模式。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bvid_or_url": {
+            "type": "string",
+            "description": "Bilibili 视频 BV 号或完整 URL"
+          },
+          "detail_level": {
+            "type": "string",
+            "description": "评论详细程度：'brief' 获取前10条热门评论；'detailed' 获取前50条热门评论及其高赞回复",
+            "enum": ["brief", "detailed"]
+          }
+        },
+        "required": ["bvid_or_url"]
+      }
+    }
+  ],
+  "resources": [],
+  "prompts": []
+}
