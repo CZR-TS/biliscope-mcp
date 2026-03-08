@@ -4,7 +4,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-A Bilibili video auxiliary MCP tool built based on mainstream AI development tools like Claude Code, Cursor, Trae, and Google Antigravity. It aims to quickly extract core video information, highlights, and popular comments through Large Language Model capabilities, helping you process audio and video content efficiently.
+✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
 
 > [!TIP]
 > ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration)(Cookies are only stored locally and will not be uploaded anywhere).
@@ -28,7 +28,8 @@ View this document in [简体中文](./README.md).
       - [Method 1: Fast Installation via CLI (Recommended)](#method-1-fast-installation-via-cli-recommended)
       - [Method 2: Manual Addition via Config File](#method-2-manual-addition-via-config-file)
     - [Claude Desktop](#claude-desktop)
-      - [Method 3: Global npm Installation](#method-3-global-npm-installation)
+      - [Method 1: Manual Addition via Config File](#method-1-manual-addition-via-config-file)
+      - [Method 2: Global npm Installation](#method-2-global-npm-installation)
     - [🏗️ Trae (Official IDE by ByteDance)](#️-trae-official-ide-by-bytedance)
     - [🌊 Windsurf (Official IDE by Codeium)](#-windsurf-official-ide-by-codeium)
     - [⚡ Zed](#-zed)
@@ -134,6 +135,8 @@ Restart Claude Code after completion.
 
 Claude Desktop supports MCP servers via a global configuration file:
 
+#### Method 1: Manual Addition via Config File
+
 1. Open the Claude Desktop configuration file:
    - Windows Path: `%APPDATA%\Claude\claude_desktop_config.json`
    - macOS Path: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -145,14 +148,19 @@ Claude Desktop supports MCP servers via a global configuration file:
   "mcpServers": {
     "bilibili-mcp": {
       "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+      "args": ["-y", "@xzxzzx/bilibili-mcp"],
+      "env": {
+        "BILIBILI_SESSDATA": "YOUR_SESSDATA",
+        "BILIBILI_BILI_JCT": "YOUR_bili_jct",
+        "BILIBILI_DEDEUSERID": "YOUR_DedeUserID"
+      }
     }
   }
 }
 ```
 3. Save the file and restart Claude Desktop or start a new conversation to load the tools.
 
-#### Method 3: Global npm Installation
+#### Method 2: Global npm Installation
 
 Manage configuration via the CLI tool after installation:
 
@@ -399,9 +407,18 @@ npm run watch
 ## ⚖️ Safety and Disclaimer
 
 - **Trademark**: Bilibili is a registered trademark of Bilibili Inc. This is a third-party open-source tool.
-- **Spirit**: For personal learning and research only. Commercial exploitation or large-scale scraping is prohibited.
 - **Liability**: Requests originate locally. Developers are not responsible for account restrictions.
 - **Privacy**: No back-end uploading; credentials stored locally.
 
 ### License
 Open-sourced under **GNU General Public License v3.0**.
+
+---
+
+## 🛠️ Development Process
+
+This project is a crystal of AI-collaborative development, spanning from prototype to refinement:
+
+1.  **Initial Generation**: Core architecture and base logic were rapidly built by **Claude Code** (powered by **GLM-4.7** model).
+2.  **Debugging & Optimization**: Bugs were fixed and features enhanced using **Claude** and **Gemini** models within the **Antigravity** environment, ensuring stable subtitle extraction and comment analysis.
+3.  **Multi-IDE Compatibility**: Through iterative updates, it now seamlessly supports Cursor, Trae, Windsurf, Zed, and mainstream AI CLI tools.

@@ -4,12 +4,16 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-用claude code(glm4.7模型)做的总结B站视频的MCP(经过antigravity里的claude,gemini模型修改bug)(提取字幕与评论)
+✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
+✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
+🌐 **[English Documentation](./README_EN.md)**
 
 > [!TIP]
 > ⚠️ **提示**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)(凭证只会保存在本地，不会上传到任何地方)。
+>
+> ⚠️ **Notice**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#️-credential-configuration) (Cookies are only stored locally and will not be uploaded anywhere).
 
-View this document in [English](./README_EN.md).
+
 
 ---
 
@@ -28,7 +32,8 @@ View this document in [English](./README_EN.md).
       - [方法一：通过 CLI 命令快速安装（推荐）](#方法一通过-cli-命令快速安装推荐)
       - [方法二：通过配置文件手动添加（高级）](#方法二通过配置文件手动添加高级)
     - [Claude Desktop (桌面客户端)](#claude-desktop-桌面客户端)
-      - [方法三：通过 npm 全局安装](#方法三通过-npm-全局安装)
+      - [方法一：通过配置文件手动添加](#方法一通过配置文件手动添加)
+      - [方法二：通过 npm 全局安装](#方法二通过-npm-全局安装)
     - [🏗️ Trae (字节跳动官方 IDE)](#️-trae-字节跳动官方-ide)
     - [🌊 Windsurf (Codeium 官方 IDE)](#-windsurf-codeium-官方-ide)
     - [⚡ Zed](#-zed)
@@ -47,6 +52,7 @@ View this document in [English](./README_EN.md).
   - [🛠️ 开发指南](#️-开发指南)
   - [⚖️ 安全性与免责声明](#️-安全性与免责声明)
     - [许可证](#许可证)
+  - [🛠️ 开发过程](#️-开发过程)
 
 ---
 
@@ -134,6 +140,8 @@ claude mcp add bilibili-mcp --command "npx" --args "-y" --args "@xzxzzx/bilibili
 
 Claude Desktop 支持通过全局配置文件接入 MCP 服务器：
 
+#### 方法一：通过配置文件手动添加
+
 1. 打开 Claude Desktop 配置文件：
    - Windows 路径：`%APPDATA%\Claude\claude_desktop_config.json`
    - macOS 路径：`~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -145,14 +153,19 @@ Claude Desktop 支持通过全局配置文件接入 MCP 服务器：
   "mcpServers": {
     "bilibili-mcp": {
       "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+      "args": ["-y", "@xzxzzx/bilibili-mcp"],
+      "env": {
+        "BILIBILI_SESSDATA": "你的_SESSDATA",
+        "BILIBILI_BILI_JCT": "你的_bili_jct",
+        "BILIBILI_DEDEUSERID": "你的_DedeUserID"
+      }
     }
   }
 }
 ```
 3. 保存文件并从侧边栏重启或重新开启对话。
 
-#### 方法三：通过 npm 全局安装
+#### 方法二：通过 npm 全局安装
 
 安装后可直接使用命令行工具管理配置：
 
@@ -427,3 +440,12 @@ npm run watch
 ### 许可证
 
 基于 **GNU General Public License v3.0** 开源。
+
+---
+
+## 🛠️ 开发过程
+
+本项目是一个典型的 AI 协同开发的结晶，完整经历了从原型到完善的过程：
+
+1.  **初版生成**：由 **Claude Code** (搭载 **GLM-4.7** 模型) 快速搭建核心架构与基础逻辑。
+2.  **调试与优化**：在 **Antigravity** 环境下，利用 **Claude** 和 **Gemini** 模型进行深度的 Bug 修复与功能增强，确保了字幕提取与评论分析的稳定性。
