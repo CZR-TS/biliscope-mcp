@@ -4,7 +4,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
+## ✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
 
 > [!TIP]
 > ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration)(Cookies are only stored locally and will not be uploaded anywhere).
@@ -422,3 +422,14 @@ This project is a crystal of AI-collaborative development, spanning from prototy
 1.  **Initial Generation**: Core architecture and base logic were rapidly built by **Claude Code** (powered by **GLM-4.7** model).
 2.  **Debugging & Optimization**: Bugs were fixed and features enhanced using **Claude** and **Gemini** models within the **Antigravity** environment, ensuring stable subtitle extraction and comment analysis.
 3.  **Multi-IDE Compatibility**: Through iterative updates, it now seamlessly supports Cursor, Trae, Windsurf, Zed, and mainstream AI CLI tools.
+
+---
+
+## 💬 Feedback & Suggestions
+
+If you encounter any issues or have feature suggestions, feel free to reach out:
+
+- **Submit an Issue**: [GitHub Issues](https://github.com/365903728-oss/bilibili-mcp/issues) — **Recommended**, I check and respond regularly.
+- **Discussions**: Join our [GitHub Discussions](https://github.com/365903728-oss/bilibili-mcp/discussions) (if enabled) for general chat.
+
+Thank you for your support!

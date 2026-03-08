@@ -4,9 +4,9 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
-✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
-🌐 **[English Documentation](./README_EN.md)**
+## ✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
+## ✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
+### 🌐 **[English Documentation](./README_EN.md)**
 
 > [!TIP]
 > ⚠️ **提示**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)(凭证只会保存在本地，不会上传到任何地方)。
@@ -20,6 +20,9 @@
 ## 📑 目录
 
 - [Bilibili MCP Tool](#bilibili-mcp-tool)
+  - [✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀](#-为你的-ai-助手装上-b-站的眼睛一键提取视频字幕与热门评论助力高效信息总结-)
+  - [✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀](#-equip-your-ai-assistant-with-bilibili-eyes-one-click-extraction-of-video-subtitles-and-popular-comments-for-efficient-information-summarization-)
+    - [🌐 **English Documentation**](#-english-documentation)
   - [📑 目录](#-目录)
   - [⚡ 快速预检](#-快速预检)
   - [🌟 功能特性](#-功能特性)
@@ -53,6 +56,7 @@
   - [⚖️ 安全性与免责声明](#️-安全性与免责声明)
     - [许可证](#许可证)
   - [🛠️ 开发过程](#️-开发过程)
+  - [💬 反馈与建议](#-反馈与建议)
 
 ---
 
@@ -449,3 +453,15 @@ npm run watch
 
 1.  **初版生成**：由 **Claude Code** (搭载 **GLM-4.7** 模型) 快速搭建核心架构与基础逻辑。
 2.  **调试与优化**：在 **Antigravity** 环境下，利用 **Claude** 和 **Gemini** 模型进行深度的 Bug 修复与功能增强，确保了字幕提取与评论分析的稳定性。
+
+---
+
+## 💬 反馈与建议
+
+如果您在使用过程中遇到任何问题，或者有好的功能建议，欢迎通过以下方式联系：
+
+- **提交 Issue**：[GitHub Issues](https://github.com/365903728-oss/bilibili-mcp/issues) —— **推荐方式**，我会定期查看并回复。
+- **项目讨论**：在 [GitHub Discussions](https://github.com/365903728-oss/bilibili-mcp/discussions)（如果已开启）中交流。
+
+感谢您的支持！
+
