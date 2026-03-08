@@ -3,14 +3,17 @@
   "version": "1.3.3",
   "description": "Bilibili MCP tool for video and comment summarization",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
+  "module": "./src/index.ts",
   "bin": {
     "bilibili-mcp": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "start": "node dist/index.js",
+    "start": "node dist/server.cjs",
+    "dev": "smithery dev",
+    "build:smithery": "smithery build",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:env": "node -e \"console.log('检查环境变量...'); console.log('BILIBILI_SESSDATA:', process.env.BILIBILI_SESSDATA ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_BILI_JCT:', process.env.BILIBILI_BILI_JCT ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_DEDEUSERID:', process.env.BILIBILI_DEDEUSERID ? '✅ 已配置' : '❌ 未配置');\"",
@@ -58,7 +61,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^14.0.3",
     "dotenv": "^17.2.4",
     "quick-lru": "^7.3.0"
@@ -68,7 +71,9 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.1",
     "@semantic-release/npm": "^12.0.1",
+    "@smithery/cli": "^4.5.0",
     "@types/node": "^22.19.8",
+    "esbuild": "^0.24.2",
     "semantic-release": "^25.0.3",
     "typescript": "^5.7.2"
   }
