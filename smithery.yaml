@@ -9,4 +9,4 @@ transport: stdio
 entry: src/index.ts
 
 build:
-  output: dist/server.cjs
+  output: dist/index.js
