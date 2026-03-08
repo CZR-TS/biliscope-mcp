@@ -6,7 +6,7 @@
 
 ## ✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
 ## ✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
-### 🌐 **[English Documentation](./README_EN.md)**
+### 🌐 **[English Documentation](./README_EN.md)** (English version here)
 
 > [!TIP]
 > ⚠️ **提示**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)(凭证只会保存在本地，不会上传到任何地方)。
@@ -22,7 +22,7 @@
 - [Bilibili MCP Tool](#bilibili-mcp-tool)
   - [✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀](#-为你的-ai-助手装上-b-站的眼睛一键提取视频字幕与热门评论助力高效信息总结-)
   - [✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀](#-equip-your-ai-assistant-with-bilibili-eyes-one-click-extraction-of-video-subtitles-and-popular-comments-for-efficient-information-summarization-)
-    - [🌐 **English Documentation**](#-english-documentation)
+    - [🌐 **English Documentation** (English version here)](#-english-documentation-english-version-here)
   - [📑 目录](#-目录)
   - [⚡ 快速预检](#-快速预检)
   - [🌟 功能特性](#-功能特性)
