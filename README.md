@@ -6,7 +6,7 @@
 
 ## ✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
 ## ✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
-🌐 **[English Documentation](https://github.com/365903728-oss/bilibili-mcp/blob/master/README_EN.md)**  
+🌐 **[English Documentation](https://github.com/365903728-oss/bilibili-mcp/blob/master/README_EN.md)** (English read me version here)  
 📜 **[更新日志 (Changelog)](https://github.com/365903728-oss/bilibili-mcp/blob/master/CHANGELOG.md)**
 
 > [!TIP]
@@ -23,12 +23,12 @@
 - [Bilibili MCP Tool](#bilibili-mcp-tool)
   - [✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀](#-为你的-ai-助手装上-b-站的眼睛一键提取视频字幕与热门评论助力高效信息总结-)
   - [✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀](#-equip-your-ai-assistant-with-bilibili-eyes-one-click-extraction-of-video-subtitles-and-popular-comments-for-efficient-information-summarization-)
-    - [🌐 **English Documentation** (English version here)](#-english-documentation-english-version-here)
   - [📑 目录](#-目录)
   - [⚡ 快速预检](#-快速预检)
   - [🌟 功能特性](#-功能特性)
     - [1. 视频总结 (`get_video_info`)](#1-视频总结-get_video_info)
     - [2. 评论总结 (`get_video_comments`)](#2-评论总结-get_video_comments)
+    - [3. 🛡️ 稳健性增强](#3-️-稳健性增强)
   - [📋 环境要求](#-环境要求)
   - [🚀 安装方式](#-安装方式)
     - [🖱️ Cursor](#️-cursor)
@@ -86,6 +86,9 @@
 - 支持两种详细程度：
   - `brief`: 10 条热门评论速览
   - `detailed`: 50 条热门评论 + 高赞连带回复
+
+### 3. 🛡️ 稳健性增强
+- **Cookie 过期智能检测**：当字幕获取为空时自动验证登录状态，区分“无字幕视频”与“凭证失效”，并抛出明确的 `COOKIE_EXPIRED` 错误，避免静默降级。
 
 ---
 

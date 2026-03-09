@@ -23,6 +23,7 @@ View this document in [简体中文](./README.md)
   - [🌟 Features](#-features)
     - [1. Video Summarization (`get_video_info`)](#1-video-summarization-get_video_info)
     - [2. Comment Summarization (`get_video_comments`)](#2-comment-summarization-get_video_comments)
+    - [3. 🛡️ Robustness Enhancement](#3-️-robustness-enhancement)
   - [📋 Requirements](#-requirements)
   - [🚀 Installation](#-installation)
     - [🖱️ Cursor](#️-cursor)
@@ -80,6 +81,9 @@ Before proceeding with installation, please ensure you are familiar with [How to
 - Supports two levels of detail:
   - `brief`: 10 popular comments summary.
   - `detailed`: 50 popular comments + high-quality replies.
+
+### 3. 🛡️ Robustness Enhancement
+- **Intelligent Cookie Expiration Detection**: Automatically verifies login status when subtitles are empty, distinguishing between "videos without subtitles" and "invalid credentials," and throwing a clear `COOKIE_EXPIRED` error to prevent silent degradation.
 
 ---
 
