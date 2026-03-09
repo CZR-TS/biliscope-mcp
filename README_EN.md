@@ -9,13 +9,15 @@
 > [!TIP]
 > ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration)(Cookies are only stored locally and will not be uploaded anywhere).
 
-View this document in [简体中文](./README.md) | 📜 **[Changelog](./CHANGELOG.md)**
+View this document in [简体中文](./README.md)  
+📜 **[Changelog](./CHANGELOG.md)**
 
 ---
 
 ## 📑 Table of Contents
 
 - [Bilibili MCP Tool](#bilibili-mcp-tool)
+  - [✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀](#-equip-your-ai-assistant-with-bilibili-eyes-one-click-extraction-of-video-subtitles-and-popular-comments-for-efficient-information-summarization-)
   - [📑 Table of Contents](#-table-of-contents)
   - [⚡ Pre-check](#-pre-check)
   - [🌟 Features](#-features)
@@ -48,6 +50,8 @@ View this document in [简体中文](./README.md) | 📜 **[Changelog](./CHANGEL
   - [🛠️ Development Guide](#️-development-guide)
   - [⚖️ Safety and Disclaimer](#️-safety-and-disclaimer)
     - [License](#license)
+  - [🛠️ Development Process](#️-development-process)
+  - [💬 Feedback \& Suggestions](#-feedback--suggestions)
 
 ---
 
