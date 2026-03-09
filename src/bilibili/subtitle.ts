@@ -1,8 +1,9 @@
 // 字幕处理逻辑
-import { getVideoInfo, getVideoSubtitle, getSubtitleContent } from "./client.js";
+import { getVideoInfo, getVideoSubtitle, getSubtitleContent, checkLoginStatus } from "./client.js";
 import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
-import { PaidVideoError } from "../utils/errors.js";
+import { BilibiliAPIError, PaidVideoError } from "../utils/errors.js";
+
 
 export interface SubtitleData {
   data_source: "subtitle" | "description";
@@ -123,8 +124,25 @@ export async function getVideoInfoWithSubtitle(
       const subtitleData = await getVideoSubtitle(bvid, cid);
 
       if (!subtitleData?.subtitle?.subtitles || subtitleData.subtitle.subtitles.length === 0) {
-        // 没有字幕，使用简介作为降级方案
-        console.error(`No subtitles available for video ${bvid}`);
+        // 字幕列表为空。主动调用 /x/web-interface/nav 验证登录状态。
+        // 理由：B站不会因 Cookie 无效就返回 -101，而是静默降级——字幕列表返回空。
+        // 通过核实登录状态，我们可以区分两种情况：
+        //   1. 已登录但视频确实无字幕 → 合法降级
+        //   2. 未登录（Cookie 过期）→ 抛出明确错误，拒绝静默降级
+        console.error(`No subtitles for video ${bvid}. Verifying login status...`);
+        const { isLogin } = await checkLoginStatus();
+        if (!isLogin) {
+          throw new BilibiliAPIError(
+            `视频 ${bvid} 的字幕获取为空，经核实当前 Bilibili Cookie 已失效（未登录），请更新 .env 中的 SESSDATA 等配置。`,
+            'COOKIE_EXPIRED',
+            undefined,
+            { code: -101, bvid }
+          );
+        }
+
+        // 已登录但视频本身无字幕，使用简介降级
+        console.error(`No subtitles available for video ${bvid} (logged in, video has no subtitles)`);
+
         const result: SubtitleData = {
           data_source: "description",
           video_info: {
@@ -196,8 +214,13 @@ export async function getVideoInfoWithSubtitle(
       cacheManager.setVideoInfo(cacheKey, result);
       return result;
     } catch (error) {
-      // 获取字幕失败，使用简介作为降级方案
-      console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
+      // COOKIE_EXPIRED 错误必须向上传播，不能静默降级
+      if (error instanceof BilibiliAPIError && error.code === 'COOKIE_EXPIRED') {
+        throw error;
+      }
+      // 其他字幕获取失败，使用简介作为降级方案
+      console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error instanceof Error ? error.message : error);
+
       const result: SubtitleData = {
         data_source: "description",
         video_info: {

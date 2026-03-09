@@ -8,6 +8,35 @@ import { createHash } from 'crypto';
 
 const BASE_URL = config.baseUrl;
 
+/**
+ * 检查当前 Cookie 是否处于登录状态。
+ * 通过调用 /x/web-interface/nav 接口，解析 isLogin 字段来判断。
+ * 该函数不会在日志或错误信息中输出任何 Cookie 内容。
+ */
+export async function checkLoginStatus(): Promise<{ isLogin: boolean }> {
+  try {
+    const authHeaders = credentialManager.getAuthHeaders();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+    const resp = await fetch(`${BASE_URL}/x/web-interface/nav`, {
+      headers: {
+        'User-Agent': config.userAgent,
+        'Referer': config.referer,
+        ...authHeaders,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!resp.ok) return { isLogin: false };
+    const data = await resp.json();
+    return { isLogin: data?.data?.isLogin === true };
+  } catch {
+    // 网络问题或超时，保守地认为登录状态未知，返回 false
+    return { isLogin: false };
+  }
+}
+
+
 // WBI 缓存
 let cachedWBI: { imgKey: string; subKey: string; mixKey: string; expireTime: number } | null = null;
 const CACHE_EXPIRATION_MS = config.wbiCacheExpirationMs;
