@@ -322,7 +322,14 @@ export async function fetchWithWBI(
         const data = await response.json();
 
         if (data.code !== 0) {
-          // 检测特定错误类型
+          // Detect specific error types
+          if (data.code === -101) {
+            console.error('❌ 检测到 Bilibili Cookie 已过期或失效 (-101):', {
+              url: url.toString()
+            });
+            throw new BilibiliAPIError('检测到当前 Bilibili Cookie 已失效（未登录），请更新配置。', 'COOKIE_EXPIRED', undefined, { code: data.code });
+          }
+
           if (data.code === -404 && data.message === '啥都木有') {
             console.error('❌ 评论API返回错误:', {
               code: data.code,
@@ -411,7 +418,14 @@ export async function fetchWithoutWBI(
         const data = await response.json();
 
         if (data.code !== 0) {
-          // 检测特定错误类型
+          // Detect specific error types
+          if (data.code === -101) {
+            console.error('❌ 检测到 Bilibili Cookie 已过期或失效 (-101):', {
+              url: url.toString()
+            });
+            throw new BilibiliAPIError('检测到当前 Bilibili Cookie 已失效（未登录），请更新配置。', 'COOKIE_EXPIRED', undefined, { code: data.code });
+          }
+
           if (data.code === -404 && data.message === '啥都木有') {
             throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
           }
