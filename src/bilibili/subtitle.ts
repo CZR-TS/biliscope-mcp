@@ -111,22 +111,11 @@ export async function getVideoInfoWithSubtitle(
     const pubdate = videoData.pubdate;  // Unix 时间戳（秒）
     const formattedDate = pubdate ? formatPublishDate(pubdate) : undefined;
 
-    // 检测付费视频
+    // 移除对付费视频的硬性拦截，因为即使是需要登录或付费的视频，API 有时也会返回 AI 字幕（至少登录状态下提供）
+    // 旧逻辑会在这里直接退出并返回描述，现在我们让它继续尝试去调取 subtitle 接口。
     if (videoData.need_login_subtitle || videoData.preview_toast?.includes("付费")) {
-      console.error(`Video ${bvid} appears to be a paid video`);
-      const result: SubtitleData = {
-        data_source: "description",
-        video_info: {
-          title,
-          description: description || "该视频为付费内容，无法获取完整简介",
-          tags: tags.length > 0 ? tags : ["付费视频"],
-          pubdate: formattedDate,
-          pubdate_timestamp: pubdate,
-        },
-      };
-      // 存入缓存
-      cacheManager.setVideoInfo(cacheKey, result);
-      return result;
+      console.warn(`Video ${bvid} has 'need_login_subtitle' or '付费' flag. Will still attempt to fetch subtitles.`);
+      // 仅用于调试，不中断流程
     }
 
     // 尝试获取字幕
