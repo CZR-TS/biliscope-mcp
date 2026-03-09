@@ -1,4 +1,8 @@
 {
+  "serverInfo": {
+    "name": "bilibili-mcp-server",
+    "version": "1.0.0"
+  },
   "tools": [
     {
       "name": "get_video_info",
