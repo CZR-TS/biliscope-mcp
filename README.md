@@ -6,7 +6,7 @@
 
 ## ✨ **为你的 AI 助手装上 B 站的眼睛**：一键提取视频字幕与热门评论，助力高效信息总结 🚀
 ## ✨ **Equip your AI assistant with "Bilibili Eyes"**: One-click extraction of video subtitles and popular comments for efficient information summarization 🚀
-🌐 **[English Documentation](https://github.com/365903728-oss/bilibili-mcp/blob/master/README_EN.md)** (English version here)
+🌐 **[English Documentation](https://github.com/365903728-oss/bilibili-mcp/blob/master/README_EN.md)** | 📜 **[更新日志 (Changelog)](https://github.com/365903728-oss/bilibili-mcp/blob/master/CHANGELOG.md)**
 
 > [!TIP]
 > ⚠️ **提示**：使用前请务必配置您的 B 站 Cookie，否则将无法提取视频字幕与评论。详见 [**⚙️ 凭证配置**](#️-凭证配置)(凭证只会保存在本地，不会上传到任何地方)。

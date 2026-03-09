@@ -9,7 +9,7 @@
 > [!TIP]
 > ⚠️ **Quick Start**: Please make sure to configure your Bilibili Cookies before use, otherwise video subtitles and comments cannot be extracted. See [**⚙️ Credential Configuration**](#⚙️-credential-configuration)(Cookies are only stored locally and will not be uploaded anywhere).
 
-View this document in [简体中文](./README.md).
+View this document in [简体中文](./README.md) | 📜 **[Changelog](./CHANGELOG.md)**
 
 ---
 
