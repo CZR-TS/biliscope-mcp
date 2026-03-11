@@ -23,6 +23,19 @@ Thumbs.db
 *.tmp
 .cache/
 .smithery/
+get_subtitle.py
+help.txt
+cookie_expiry_log.md
+
+# 测试和输出
+test_*.ts
+test_*.js
+test-config.js
+sub_*.txt
+subtitle_*.txt
+subtitle_data.json
+transcript_output.json
+*.log
 
 # Semantic Release
 .npmrc
