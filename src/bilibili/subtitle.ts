@@ -153,8 +153,8 @@ export async function getVideoInfoWithSubtitle(
             pubdate_timestamp: pubdate,
           },
         };
-        // 存入缓存
-        cacheManager.setVideoInfo(cacheKey, result);
+        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
+        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
         return result;
       }
 
@@ -172,8 +172,8 @@ export async function getVideoInfoWithSubtitle(
             pubdate_timestamp: pubdate,
           },
         };
-        // 存入缓存
-        cacheManager.setVideoInfo(cacheKey, result);
+        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
+        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
         return result;
       }
 
@@ -191,8 +191,8 @@ export async function getVideoInfoWithSubtitle(
             pubdate_timestamp: pubdate,
           },
         };
-        // 存入缓存
-        cacheManager.setVideoInfo(cacheKey, result);
+        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
+        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
         return result;
       }
 
@@ -231,7 +231,7 @@ export async function getVideoInfoWithSubtitle(
           pubdate_timestamp: pubdate,
         },
       };
-      // 存入缓存
+      // 成功获取到字幕，存入缓存
       cacheManager.setVideoInfo(cacheKey, result);
       return result;
     }
