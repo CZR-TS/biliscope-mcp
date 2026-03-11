@@ -493,6 +493,10 @@ export async function getVideoInfo(bvid: string) {
 
 /**
  * 获取视频字幕信息
+ *
+ * 策略：优先使用带 WBI 签名的 /x/player/wbi/v2 接口。
+ * 若该接口返回空字幕（部分视频的 AI 字幕 subtitle_url 只在非 WBI 版接口中暴露），
+ * 自动降级到 /x/player/v2 重试一次。
  */
 export async function getVideoSubtitle(bvid: string, cid: number) {
   const authHeaders = credentialManager.getAuthHeaders();
@@ -508,7 +512,7 @@ export async function getVideoSubtitle(bvid: string, cid: number) {
       : buvidCookie;
   }
 
-  return fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, headersWithBuvid) as Promise<{
+  type SubtitleResponse = {
     subtitle: {
       subtitles: Array<{
         id: number;
@@ -517,7 +521,27 @@ export async function getVideoSubtitle(bvid: string, cid: number) {
         subtitle_url: string;
       }>;
     };
-  }>;
+  };
+
+  // 第一次尝试：WBI 签名接口
+  const wbiResult = await fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, headersWithBuvid) as SubtitleResponse;
+
+  if (wbiResult?.subtitle?.subtitles && wbiResult.subtitle.subtitles.length > 0) {
+    return wbiResult;
+  }
+
+  // WBI 接口返回空字幕，降级到非 WBI 接口重试
+  // 原因：B站部分视频（如 AI 智能字幕）的 subtitle_url 仅在 /x/player/v2 中暴露
+  console.error(`[getVideoSubtitle] WBI 接口返回空字幕，降级到 /x/player/v2 重试 (bvid=${bvid}, cid=${cid})`);
+  const fallbackResult = await fetchWithoutWBI("/x/player/v2", { bvid, cid }, headersWithBuvid) as SubtitleResponse;
+
+  if (fallbackResult?.subtitle?.subtitles && fallbackResult.subtitle.subtitles.length > 0) {
+    console.error(`[getVideoSubtitle] 降级成功，/x/player/v2 返回 ${fallbackResult.subtitle.subtitles.length} 个字幕`);
+  } else {
+    console.error(`[getVideoSubtitle] 降级后仍无字幕 (bvid=${bvid})，视频可能确实无字幕`);
+  }
+
+  return fallbackResult;
 }
 
 /**
