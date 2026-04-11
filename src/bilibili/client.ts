@@ -1,724 +1,483 @@
-// B站 API 客户端，包含 WBI 签名逻辑
-import { config } from '../config.js';
-import { BilibiliAPIError, NetworkError, TimeoutError, PaidVideoError, CommentsDisabledError } from '../utils/errors.js';
-import { logger } from '../utils/logger.js';
-import { retryManager, withRetry } from '../utils/retry.js';
-import { credentialManager } from '../utils/credentials.js';
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
+import { config } from "../config.js";
+import {
+  BilibiliAPIError,
+  CommentsDisabledError,
+  NetworkError,
+  TimeoutError,
+} from "../utils/errors.js";
+import { logger } from "../utils/logger.js";
+import { withRetry } from "../utils/retry.js";
+import { credentialManager } from "../utils/credentials.js";
 
 const BASE_URL = config.baseUrl;
 
-/**
- * 检查当前 Cookie 是否处于登录状态。
- * 通过调用 /x/web-interface/nav 接口，解析 isLogin 字段来判断。
- * 该函数不会在日志或错误信息中输出任何 Cookie 内容。
- */
-export async function checkLoginStatus(): Promise<{ isLogin: boolean }> {
-  try {
-    const authHeaders = credentialManager.getAuthHeaders();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.requestTimeoutMs);
-    const resp = await fetch(`${BASE_URL}/x/web-interface/nav`, {
-      headers: {
-        'User-Agent': config.userAgent,
-        'Referer': config.referer,
-        ...authHeaders,
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!resp.ok) return { isLogin: false };
-    const data = await resp.json();
-    return { isLogin: data?.data?.isLogin === true };
-  } catch {
-    // 网络问题或超时，保守地认为登录状态未知，返回 false
-    return { isLogin: false };
-  }
-}
-
-
-// WBI 缓存
-let cachedWBI: { imgKey: string; subKey: string; mixKey: string; expireTime: number } | null = null;
-const CACHE_EXPIRATION_MS = config.wbiCacheExpirationMs;
-
-// buvid 指纹缓存（用于规避反爬验证）
-let cachedBuvid: { buvid3: string; buvid4: string; expireTime: number } | null = null;
-
-// 请求限流 - 避免高频请求被 Bilibili 限制
-const RATE_LIMIT_MS = config.rateLimitMs;
-const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
+let cachedWBI:
+  | { imgKey: string; subKey: string; mixKey: string; expireTime: number }
+  | null = null;
+let cachedBuvid:
+  | { buvid3: string; buvid4: string; expireTime: number }
+  | null = null;
 let lastRequestTime = 0;
 let pendingPromise: Promise<void> | null = null;
 
-/**
- * 等待到下一个允许请求的时间
- */
-async function waitForRateLimit(): Promise<void> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < RATE_LIMIT_MS) {
-    const waitTime = RATE_LIMIT_MS - timeSinceLastRequest;
-    await new Promise<void>((resolve) => setTimeout(resolve, waitTime));
-  }
-
-  lastRequestTime = Date.now();
+function md5Hash(value: string): string {
+  return createHash("md5").update(value).digest("hex");
 }
 
-/**
- * 带限流和超时控制的请求包装器
- * @param fetchFn - 执行 fetch 的函数，支持 AbortController
- * @returns Promise<T>
- */
-async function throttledFetch<T>(fetchFn: (controller: AbortController) => Promise<T>): Promise<T> {
-  // 等待上一个请求完成
-  if (pendingPromise) {
-    await pendingPromise;
-  }
-
-  // 创建 AbortController 用于超时控制
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    logger.error(`Request timeout after ${REQUEST_TIMEOUT_MS}ms`, {}, { type: 'request-timeout' });
-  }, REQUEST_TIMEOUT_MS);
-
-  // 创建新的请求
-  pendingPromise = (async () => {
-    await waitForRateLimit();
-  })();
-
-  try {
-    await pendingPromise;
-    return await fetchFn(controller);
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError(`Request timeout: ${REQUEST_TIMEOUT_MS}ms`, REQUEST_TIMEOUT_MS);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-    controller.abort(); // 确保 AbortController 被清理
-    pendingPromise = null;
-  }
-}
-
-/**
- * 带重试机制的请求包装器
- * @param fetchFn - 执行 fetch 的函数
- * @returns Promise<T>
- */
-async function retryableFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
-  return withRetry(() => fetchFn(), {
-    maxRetries: 3,
-    baseDelay: 1000,
-    maxDelay: 10000,
-    retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-    retryableErrorTypes: ['NetworkError', 'TimeoutError', 'AbortError']
-  });
-}
-
-/**
- * 生成 WBI 签名所需的混合密钥
- */
 function getMixKey(imgKey: string, subKey: string): string {
-  // WBI 签名使用特定的混合顺序
   const saltTable = [
     46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
     33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
     61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
-    36, 20, 34, 44, 52
+    36, 20, 34, 44, 52,
   ];
   const mixKey = imgKey + subKey;
-  return saltTable.map((i) => mixKey[i]).join("");
+  return saltTable.map((index) => mixKey[index]).join("");
 }
 
-/**
- * 获取 buvid 指纹 Cookie（规避 Bilibili 反爬 -352 错误）
- * buvid3/buvid4 是 Bilibili 用来识别浏览器的指纹 Cookie，
- * 无需登录即可从 /x/frontend/finger/spi 接口获取
- */
+function isAuthFailure(error: unknown): boolean {
+  if (error instanceof BilibiliAPIError) {
+    return [
+      "COOKIE_EXPIRED",
+      "BILIBILI_AUTH_REQUIRED",
+      "BILIBILI_COOKIE_INVALID",
+      "ACCESS_DENIED",
+    ].includes(error.code);
+  }
+
+  if (error instanceof NetworkError) {
+    return error.statusCode === 401 || error.statusCode === 412;
+  }
+
+  return false;
+}
+
+async function waitForRateLimit(): Promise<void> {
+  const now = Date.now();
+  const delta = now - lastRequestTime;
+  if (delta < config.rateLimitMs) {
+    await new Promise((resolve) => setTimeout(resolve, config.rateLimitMs - delta));
+  }
+  lastRequestTime = Date.now();
+}
+
+async function throttledFetch<T>(task: (controller: AbortController) => Promise<T>): Promise<T> {
+  if (pendingPromise) {
+    await pendingPromise;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+  pendingPromise = waitForRateLimit();
+
+  try {
+    await pendingPromise;
+    return await task(controller);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new TimeoutError(`请求超时：${config.requestTimeoutMs}ms`, config.requestTimeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    pendingPromise = null;
+  }
+}
+
+async function retryableFetch<T>(task: () => Promise<T>): Promise<T> {
+  return withRetry(task, {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 10000,
+    retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+    retryableErrorTypes: ["NetworkError", "TimeoutError", "AbortError"],
+  });
+}
+
+function generateWbiRid(params: Record<string, string | number>, mixKey: string): string {
+  const sortedQuery = Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+  return md5Hash(sortedQuery + mixKey);
+}
+
+function mapBilibiliError(payload: any, url: string): BilibiliAPIError {
+  const code = payload?.code;
+  const message = payload?.message || payload?.msg || "未知错误";
+
+  if (code === -101 || /未登录|登录|cookie/i.test(message)) {
+    return new BilibiliAPIError(
+      "B 站登录态已失效。",
+      "BILIBILI_COOKIE_INVALID",
+      undefined,
+      payload,
+      true,
+      "请确认 CookieCloud 已同步到最新 B 站 Cookie。",
+    );
+  }
+
+  if (code === -403 || code === -412) {
+    return new BilibiliAPIError(
+      "当前请求被 B 站拒绝，通常是登录态或风控问题。",
+      "BILIBILI_AUTH_REQUIRED",
+      undefined,
+      payload,
+      true,
+      "请检查 CookieCloud 是否同步到最新浏览器状态。",
+    );
+  }
+
+  if (code === -404 && message === "啥都木有") {
+    return new BilibiliAPIError(
+      "评论不可用。",
+      "COMMENTS_DISABLED",
+      undefined,
+      payload,
+      false,
+      "该视频可能关闭了评论或当前接口不可访问。",
+    );
+  }
+
+  return new BilibiliAPIError(
+    `${message} (${code})`,
+    "API_ERROR",
+    undefined,
+    { payload, url },
+    false,
+    "请稍后重试，或检查接口参数是否正确。",
+  );
+}
+
+interface RequestOptions {
+  includeAuth?: boolean;
+  useWbi?: boolean;
+  referer?: string;
+  rawText?: boolean;
+  appendBuvid?: boolean;
+}
+
+async function getWBI(): Promise<{ mixKey: string }> {
+  const now = Date.now();
+  if (cachedWBI && cachedWBI.expireTime > now) {
+    return { mixKey: cachedWBI.mixKey };
+  }
+
+  const navData = await rawRequest<any>(
+    "/x/web-interface/nav",
+    {},
+    { includeAuth: false, useWbi: false, referer: config.referer },
+  );
+  const wbiImg = navData?.wbi_img;
+  const imgKeyMatch = wbiImg?.img_url?.match(/([^/_]+)(?=\.[a-zA-Z]+$)/);
+  const subKeyMatch = wbiImg?.sub_url?.match(/([^/_]+)(?=\.[a-zA-Z]+$)/);
+
+  if (!imgKeyMatch || !subKeyMatch) {
+    throw new BilibiliAPIError(
+      "无法获取 WBI 签名参数。",
+      "WBI_DATA_MISSING",
+      undefined,
+      wbiImg,
+      true,
+      "稍后重试，或检查 B 站接口是否发生变化。",
+    );
+  }
+
+  const mixKey = getMixKey(imgKeyMatch[0], subKeyMatch[0]);
+  cachedWBI = {
+    imgKey: imgKeyMatch[0],
+    subKey: subKeyMatch[0],
+    mixKey,
+    expireTime: now + config.wbiCacheExpirationMs,
+  };
+  return { mixKey };
+}
+
 async function getBuvid(): Promise<{ buvid3: string; buvid4: string } | null> {
   const now = Date.now();
-  const BUVID_CACHE_MS = 24 * 60 * 60 * 1000; // 缓存 24 小时
-
   if (cachedBuvid && cachedBuvid.expireTime > now) {
     return { buvid3: cachedBuvid.buvid3, buvid4: cachedBuvid.buvid4 };
   }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const resp = await fetch(`${BASE_URL}/x/frontend/finger/spi`, {
-      headers: {
-        'User-Agent': config.userAgent,
-        'Referer': config.referer,
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!resp.ok) return null;
-
-    const data = await resp.json();
-    if (data.code !== 0 || !data.data?.b_3 || !data.data?.b_4) return null;
-
+    const data = await rawRequest<any>(
+      "/x/frontend/finger/spi",
+      {},
+      { includeAuth: false, useWbi: false },
+    );
+    if (!data?.b_3 || !data?.b_4) {
+      return null;
+    }
     cachedBuvid = {
-      buvid3: data.data.b_3,
-      buvid4: data.data.b_4,
-      expireTime: now + BUVID_CACHE_MS,
+      buvid3: data.b_3,
+      buvid4: data.b_4,
+      expireTime: now + 24 * 60 * 60 * 1000,
     };
-
-    logger.info('Buvid fingerprint fetched', { buvid3: data.data.b_3.substring(0, 8) + '...' });
-    return { buvid3: cachedBuvid.buvid3, buvid4: cachedBuvid.buvid4 };
-  } catch (error) {
-    logger.warn('Failed to fetch buvid fingerprint, continuing without it',
-      { error: error instanceof Error ? error.message : error });
+    return { buvid3: data.b_3, buvid4: data.b_4 };
+  } catch {
     return null;
   }
 }
 
-
-/**
- * 获取 WBI 签名密钥
- */
-async function getWBI(): Promise<{ imgKey: string; subKey: string; mixKey: string }> {
-  // 检查缓存是否有效（1小时过期）
-  const now = Date.now();
-  if (cachedWBI && cachedWBI.expireTime > now) {
-    return { imgKey: cachedWBI.imgKey, subKey: cachedWBI.subKey, mixKey: cachedWBI.mixKey };
-  }
-
-  // 缓存已过期，会创建新的
-
-  try {
-    const result = await retryableFetch(async () => {
-      // 获取 nav 数据中的 wbi_img 字段
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      const navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
-        headers: {
-          "User-Agent": config.userAgent,
-          "Referer": config.referer,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!navRes.ok) {
-        throw new NetworkError(`Failed to fetch WBI: ${navRes.status}`, undefined, `${BASE_URL}/x/web-interface/nav`);
-      }
-
-      const navData = await navRes.json();
-      const wbiImg = navData.data?.wbi_img;
-
-      if (!wbiImg) {
-        throw new BilibiliAPIError("WBI image data not found", 'WBI_DATA_MISSING');
-      }
-
-      // 提取 img_key 和 sub_key
-      // 格式类似: img_url: https://i0.hdslb.com/bfs/wbi/2608f8a68f3141d9_2.png
-      const imgKeyMatch = wbiImg.img_url?.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
-      const subKeyMatch = wbiImg.sub_url?.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
-
-      if (!imgKeyMatch || !subKeyMatch) {
-        throw new BilibiliAPIError("Failed to extract WBI keys", 'WBI_KEY_EXTRACT_FAILED');
-      }
-
-      const imgKey = imgKeyMatch[0];
-      const subKey = subKeyMatch[0];
-      const mixKey = getMixKey(imgKey, subKey);
-
-      // 缓存 WBI（1小时后过期）
-      cachedWBI = {
-        imgKey,
-        subKey,
-        mixKey,
-        expireTime: now + 60 * 60 * 1000,
-      };
-
-      return { imgKey, subKey, mixKey };
-    });
-
-    return result;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError(`WBI request timeout: ${REQUEST_TIMEOUT_MS}ms`, REQUEST_TIMEOUT_MS);
-    }
-    logger.error("Error getting WBI", { error: error instanceof Error ? error.message : error }, { type: 'wbi-error' });
-    throw new NetworkError("Failed to fetch WBI", error instanceof Error ? error : undefined, `${BASE_URL}/x/web-interface/nav`);
-  }
-}
-
-/**
- * 生成 WBI 签名
- */
-function generateWBISign(params: Record<string, string | number>, mixKey: string): string {
-  // 将参数按字典序排序
-  const sortedParams = Object.keys(params)
-    .sort()
-    .reduce((result, key) => {
-      result[key] = params[key];
-      return result;
-    }, {} as Record<string, string | number>);
-
-  // 构建 query 字符串
-  const queryStr = Object.entries(sortedParams)
-    .map(([key, value]) => `${key}=${value}`)
-    .join("&");
-
-  // 计算 w_rid（使用 MD5 哈希）
-  const strToSign = queryStr + mixKey;
-  const w_rid = md5Hash(strToSign);
-
-  return w_rid;
-}
-
-/**
- * MD5 哈希函数 - 使用 Node.js crypto 模块
- * 这是 B 站 WBI 签名算法真正需要的哈希函数
- */
-function md5Hash(str: string): string {
-  return createHash('md5').update(str).digest('hex');
-}
-
-/**
- * 带有 WBI 签名的 GET 请求
- */
-export async function fetchWithWBI(
+async function rawRequest<T>(
   path: string,
   params: Record<string, string | number>,
-  additionalHeaders: Record<string, string> = {}
-): Promise<unknown> {
-  return retryableFetch(async () => {
-    return throttledFetch(async (controller) => {
-      try {
-        const { mixKey } = await getWBI();
+  options: RequestOptions = {},
+): Promise<T> {
+  const {
+    includeAuth = true,
+    useWbi = false,
+    referer = config.referer,
+    rawText = false,
+    appendBuvid = false,
+  } = options;
 
-        // 添加时间戳参数（WBI 要求 Unix 秒级时间戳，不是毫秒）
-        params = { ...params, timestamp: Math.floor(Date.now() / 1000) };
-
-        // 生成签名
-        const w_rid = generateWBISign(params, mixKey);
-
-        // 构建 URL
-        const url = new URL(path, BASE_URL);
-        Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
-          url.searchParams.append(key, String(value));
-        });
-
-        const finalHeaders = {
-          "User-Agent": config.userAgent,
-          "Referer": additionalHeaders.Referer || config.referer,
-          "Accept": "application/json",
-          ...additionalHeaders,
-        };
-
-        // 构建安全的headers日志（隐藏敏感信息）
-        const safeHeaders: Record<string, string> = {};
-        Object.entries(finalHeaders).forEach(([key, value]) => {
-          if (key === 'Cookie') {
-            safeHeaders[key] = '***';
-          } else {
-            safeHeaders[key] = value;
-          }
-        });
-        
-        console.error('发送WBI请求:', {
-          url: url.toString(),
-          headers: safeHeaders
-        });
-
-        const response = await fetch(url.toString(), {
-          headers: finalHeaders,
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-          console.error('❌ WBI请求失败:', {
-            error: errorMsg,
-            url: url.toString(),
-            status: response.status,
-            statusText: response.statusText
-          });
-          throw new NetworkError(errorMsg, undefined, url.toString());
-        }
-
-        const data = await response.json();
-
-        if (data.code !== 0) {
-          // Detect specific error types
-          if (data.code === -101) {
-            console.error('❌ 检测到 Bilibili Cookie 已过期或失效 (-101):', {
-              url: url.toString()
-            });
-            throw new BilibiliAPIError('检测到当前 Bilibili Cookie 已失效（未登录），请更新配置。', 'COOKIE_EXPIRED', undefined, { code: data.code });
-          }
-
-          if (data.code === -404 && data.message === '啥都木有') {
-            console.error('❌ 评论API返回错误:', {
-              code: data.code,
-              message: data.message,
-              url: url.toString(),
-              params
-            });
-            throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
-          }
-          if (data.code === -403) {
-            console.error('❌ API返回权限错误(-403):', {
-              code: data.code,
-              message: data.message,
-              url: url.toString(),
-              params
-            });
-            // 评论API的-403表示访问权限不足（未登录或Cookie过期），不是付费视频
-            throw new BilibiliAPIError(data.message || '访问权限不足，请检查登录凭证是否有效', 'ACCESS_DENIED', undefined, data);
-          }
-          
-          console.error('❌ 评论API返回错误:', {
-            code: data.code,
-            message: data.message,
-            url: url.toString(),
-            params
-          });
-          throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
-        }
-
-        return data.data;
-      } catch (error) {
-        // 构建URL用于错误日志
-        const tempUrl = new URL(path, BASE_URL);
-        Object.entries(params).forEach(([key, value]) => {
-          tempUrl.searchParams.append(key, String(value));
-        });
-        
-        console.error('❌ WBI请求异常:', {
-          error: error instanceof Error ? error.message : String(error),
-          path,
-          params,
-          url: tempUrl.toString()
-        });
-        
-        logger.error(`Error fetching ${path}`, { error: error instanceof Error ? error.message : error }, { type: 'fetch-error', path });
-        throw error;
-      }
-    });
-  });
-}
-
-/**
- * 普通的 GET 请求（不需要 WBI 签名）
- */
-export async function fetchWithoutWBI(
-  path: string,
-  params?: Record<string, string | number>,
-  additionalHeaders: Record<string, string> = {}
-): Promise<unknown> {
-  console.error(`[DEBUG] fetchWithoutWBI: ${path}`, params);
-  return retryableFetch(async () => {
-    return throttledFetch(async (controller) => {
-      try {
-        const url = new URL(path, BASE_URL);
-        if (params) {
-          Object.entries(params).forEach(([key, value]) => {
-            url.searchParams.append(key, String(value));
-          });
-        }
-        console.error(`[DEBUG] Fetching URL: ${url.toString()}`);
-
-        const response = await fetch(url.toString(), {
-          headers: {
-            "User-Agent": config.userAgent,
-            "Referer": config.referer,
-            "Accept": "application/json",
-            ...additionalHeaders,
-          },
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
-        }
-
-        const data = await response.json();
-
-        if (data.code !== 0) {
-          // Detect specific error types
-          if (data.code === -101) {
-            console.error('❌ 检测到 Bilibili Cookie 已过期或失效 (-101):', {
-              url: url.toString()
-            });
-            throw new BilibiliAPIError('检测到当前 Bilibili Cookie 已失效（未登录），请更新配置。', 'COOKIE_EXPIRED', undefined, { code: data.code });
-          }
-
-          if (data.code === -404 && data.message === '啥都木有') {
-            throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
-          }
-          if (data.code === -403) {
-            throw new PaidVideoError('该视频为付费内容，无法获取完整信息');
-          }
-          throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
-        }
-
-        return data.data;
-      } catch (error) {
-        logger.error(`Error fetching ${path}`, { error: error instanceof Error ? error.message : error }, { type: 'fetch-error', path });
-        throw error;
-      }
-    });
-  });
-}
-
-/**
- * 获取视频基本信息
- */
-export async function getVideoInfo(bvid: string) {
-  return fetchWithoutWBI("/x/web-interface/view", { bvid }) as Promise<{
-    title: string;
-    desc: string;
-    pic?: string;
-    owner: { name: string; face: string };
-    stat: { view: number; danmaku: number; reply: number; favorite: number; coin: number; share: number; like: number };
-    cid: number;
-    aid: number;
-    duration: number;
-    pubdate: number;
-    tag?: { tag_name: string }[];
-  }>;
-}
-
-/**
- * 获取视频字幕信息
- *
- * 策略：优先使用带 WBI 签名的 /x/player/wbi/v2 接口。
- * 若该接口返回空字幕（部分视频的 AI 字幕 subtitle_url 只在非 WBI 版接口中暴露），
- * 自动降级到 /x/player/v2 重试一次。
- */
-export async function getVideoSubtitle(bvid: string, cid: number) {
-  const authHeaders = credentialManager.getAuthHeaders();
-
-  // 获取 buvid 指纹 Cookie，规避 B站近期将 -352 风控扩展到播放器接口的问题
-  const buvidFingerprint = await getBuvid();
-  const headersWithBuvid: Record<string, string> = { ...authHeaders };
-  if (buvidFingerprint) {
-    const existingCookie = headersWithBuvid['Cookie'] || '';
-    const buvidCookie = `buvid3=${buvidFingerprint.buvid3}; buvid4=${buvidFingerprint.buvid4}`;
-    headersWithBuvid['Cookie'] = existingCookie
-      ? `${existingCookie}; ${buvidCookie}`
-      : buvidCookie;
-  }
-
-  type SubtitleResponse = {
-    subtitle: {
-      subtitles: Array<{
-        id: number;
-        lan: string;
-        lan_doc: string;
-        subtitle_url: string;
-      }>;
+  const perform = async (forceRefresh: boolean): Promise<T> => {
+    const headers: Record<string, string> = {
+      "User-Agent": config.userAgent,
+      Referer: referer,
+      Accept: rawText ? "*/*" : "application/json",
     };
-  };
 
-  // 第一次尝试：WBI 签名接口
-  const wbiResult = await fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, headersWithBuvid) as SubtitleResponse;
+    if (includeAuth) {
+      Object.assign(headers, await credentialManager.getAuthHeaders(forceRefresh));
+    }
 
-  if (wbiResult?.subtitle?.subtitles && wbiResult.subtitle.subtitles.length > 0) {
-    return wbiResult;
-  }
+    if (appendBuvid) {
+      const buvid = await getBuvid();
+      if (buvid) {
+        const buvidCookie = `buvid3=${buvid.buvid3}; buvid4=${buvid.buvid4}`;
+        headers.Cookie = headers.Cookie ? `${headers.Cookie}; ${buvidCookie}` : buvidCookie;
+      }
+    }
 
-  // WBI 接口返回空字幕，降级到非 WBI 接口重试
-  // 原因：B站部分视频（如 AI 智能字幕）的 subtitle_url 仅在 /x/player/v2 中暴露
-  console.error(`[getVideoSubtitle] WBI 接口返回空字幕，降级到 /x/player/v2 重试 (bvid=${bvid}, cid=${cid})`);
-  const fallbackResult = await fetchWithoutWBI("/x/player/v2", { bvid, cid }, headersWithBuvid) as SubtitleResponse;
+    const requestParams = { ...params };
+    if (useWbi) {
+      const { mixKey } = await getWBI();
+      requestParams.wts = Math.floor(Date.now() / 1000);
+      requestParams.w_rid = generateWbiRid(requestParams, mixKey);
+    }
 
-  if (fallbackResult?.subtitle?.subtitles && fallbackResult.subtitle.subtitles.length > 0) {
-    console.error(`[getVideoSubtitle] 降级成功，/x/player/v2 返回 ${fallbackResult.subtitle.subtitles.length} 个字幕`);
-  } else {
-    console.error(`[getVideoSubtitle] 降级后仍无字幕 (bvid=${bvid})，视频可能确实无字幕`);
-  }
+    const url = new URL(path, BASE_URL);
+    Object.entries(requestParams).forEach(([key, value]) => {
+      url.searchParams.append(key, String(value));
+    });
 
-  return fallbackResult;
-}
-
-/**
- * 获取字幕内容
- */
-export async function getSubtitleContent(url: string): Promise<{
-  body: Array<{
-    from: number;
-    to: number;
-    location: number;
-    content: string;
-  }>;
-}> {
-  return retryableFetch(async () => {
-    return throttledFetch(async (controller) => {
-      try {
-        // 字幕 URL 可能是相对路径，需要补全
-        const fullUrl = url.startsWith("http") ? url : `https:${url}`;
-
-        const authHeaders = credentialManager.getAuthHeaders();
-        const response = await fetch(fullUrl, {
-          headers: {
-            "User-Agent": config.userAgent,
-            "Referer": config.referer,
-            ...authHeaders,
-          },
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+    return retryableFetch(async () =>
+      throttledFetch(async (controller) => {
+        logger.logAPIRequest("GET", url.toString(), requestParams);
+        let response: Response;
+        try {
+          response = await fetch(url.toString(), { headers, signal: controller.signal });
+        } catch (error) {
+          throw new NetworkError(
+            `请求失败：${url.toString()}`,
+            error instanceof Error ? error : undefined,
+            url.toString(),
+          );
         }
 
-        return await response.json();
-      } catch (error) {
-        logger.error("Error fetching subtitle content", { error: error instanceof Error ? error.message : error }, { type: 'subtitle-error', url });
-        throw error;
-      }
-    });
-  });
-}
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 412) {
+            throw new BilibiliAPIError(
+              `B 站接口返回 HTTP ${response.status}。`,
+              "BILIBILI_AUTH_REQUIRED",
+              response.status,
+              undefined,
+              true,
+              "CookieCloud 中的 B 站登录态可能已失效，请重新同步。",
+            );
+          }
+          throw new NetworkError(
+            `HTTP ${response.status}: ${response.statusText}`,
+            undefined,
+            url.toString(),
+            response.status,
+          );
+        }
 
-/**
- * 获取视频评论
- */
-export async function getVideoComments(
-  videoUrlOrBvid: string,
-  page: number = 1,
-  pageSize: number = 20,
-  sort: number = 1, // 0按时间，1按热度
-  includeReplies: boolean = true
-) {
-  const authHeaders = credentialManager.getAuthHeaders();
-  
-  // 解析视频URL或bvid
-  let bvid: string;
-  let isBangumi = false;
-  
-  if (videoUrlOrBvid.includes('bilibili.com')) {
-    // 从URL中提取bvid
-    const url = new URL(videoUrlOrBvid);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    
-    if (pathParts.includes('bangumi')) {
-      isBangumi = true;
-    }
-    
-    // 提取bvid
-    const bvidMatch = videoUrlOrBvid.match(/BV[0-9A-Za-z]{10}/);
-    if (!bvidMatch) {
-      throw new Error('无法从URL中提取BV号');
-    }
-    bvid = bvidMatch[0];
-  } else {
-    // 直接使用bvid
-    bvid = videoUrlOrBvid;
-  }
-  
-  // 获取视频信息，获取aid和cid
-  const videoInfo = await getVideoInfo(bvid);
-  const oid = videoInfo.aid || videoInfo.cid; // 优先使用aid作为oid
-  
-  // 确定type
-  let type = "1"; // 默认视频类型
-  if (isBangumi) {
-    type = "2"; // 番剧类型
-  }
-  
-  // 构建标准Referer
-  const baseVideoUrl = `https://www.bilibili.com/video/${bvid}/`;
-  
-  // 构建评论API参数（fetchWithWBI 会自动添加 timestamp，无需手动添加 _ 参数）
-  const params = {
-    oid: Number(oid), // 确保oid是数字类型
-    type,
-    pn: page, // 页码
-    ps: Math.min(pageSize, 20), // 每页评论数，最大20
-    sort: sort.toString(), // 排序：0按时间，1按热度
-    mode: "3" // 3表示按热度排序
-  };
-  
-  console.error('获取视频评论:', {
-    bvid,
-    oid: Number(oid),
-    type,
-    page,
-    pageSize,
-    sort,
-    includeReplies,
-    isBangumi
-  });
-  
-  // 构建自定义headers，包含标准Referer
-  const customHeaders = {
-    ...authHeaders,
-    "Referer": baseVideoUrl
+        if (rawText) {
+          return (await response.text()) as T;
+        }
+
+        const json = await response.json();
+        if (json.code !== 0) {
+          throw mapBilibiliError(json, url.toString());
+        }
+        return json.data as T;
+      }),
+    );
   };
 
-  // 构建普通评论API参数（无需WBI签名）
-  const plainParams = {
-    oid: Number(oid),
-    type: Number(type),
-    pn: page,
-    ps: Math.min(pageSize, 20),
-    sort,
-    mode: 3
-  };
-
-  /**
-   * 构建带 buvid 指纹的 headers 并调用普通评论API
-   * buvid3/buvid4 用于规避 Bilibili 的 -352 风控验证
-   */
-  async function fetchCommentsWithFallback() {
-    const buvid = await getBuvid();
-    const buvidHeaders: Record<string, string> = { ...customHeaders };
-    if (buvid) {
-      // 将 buvid 附加到 Cookie 头部（如果已有 Cookie 则追加）
-      const existingCookie = buvidHeaders['Cookie'] || '';
-      const buvidCookie = `buvid3=${buvid.buvid3}; buvid4=${buvid.buvid4}`;
-      buvidHeaders['Cookie'] = existingCookie
-        ? `${existingCookie}; ${buvidCookie}`
-        : buvidCookie;
-    }
-    return fetchWithoutWBI("/x/v2/reply/main", plainParams, buvidHeaders);
-  }
-  
   try {
-    // 优先尝试带WBI签名的评论API（需要有效的登录Cookie）
-    const wbiPath = "/x/v2/reply/wbi/main";
-    console.error('尝试使用WBI评论API:', wbiPath);
-
-    const mainResult = await fetchWithWBI(wbiPath, params, customHeaders) as any;
-    
-    // 如果WBI接口成功但返回空评论（可能是Cookie过期导致未登录），
-    // 则自动降级到无需鉴权的普通接口
-    if (mainResult && (!mainResult.replies || mainResult.replies.length === 0)) {
-      console.error('WBI评论API返回空评论，降级到普通评论API（无需登录）');
-      return await fetchCommentsWithFallback();
-    }
-    
-    return mainResult;
+    return await perform(false);
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ WBI评论API失败，降级到普通评论API:', errorMsg);
-    
-    // 降级到无需WBI签名的普通评论API（携带 buvid 以规避 -352 风控）
-    try {
-      return await fetchCommentsWithFallback();
-    } catch (fallbackError) {
-      const fallbackErrorMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-      console.error('❌ 普通评论API也失败:', {
-        error: fallbackErrorMsg,
-        bvid,
-        oid: Number(oid),
-      });
-      throw fallbackError;
+    if (!includeAuth || !isAuthFailure(error)) {
+      throw error;
     }
+    await credentialManager.markAuthFailureAndRefresh();
+    return perform(true);
   }
 }
 
+export async function checkLoginStatus(): Promise<{ isLogin: boolean }> {
+  try {
+    const data = await rawRequest<any>(
+      "/x/web-interface/nav",
+      {},
+      { includeAuth: true, useWbi: false },
+    );
+    return { isLogin: data?.isLogin === true };
+  } catch {
+    return { isLogin: false };
+  }
+}
+
+export async function getVideoInfoByBvid(bvid: string): Promise<any> {
+  return rawRequest("/x/web-interface/view", { bvid }, { includeAuth: true });
+}
+
+export async function getVideoInfoByAid(aid: number): Promise<any> {
+  return rawRequest("/x/web-interface/view", { aid }, { includeAuth: true });
+}
+
+export async function searchVideos(keyword: string, page = 1, pageSize = 10): Promise<any> {
+  return rawRequest(
+    "/x/web-interface/wbi/search/type",
+    { search_type: "video", keyword, page, page_size: Math.min(pageSize, 20) },
+    { includeAuth: false, useWbi: true },
+  );
+}
+
+export async function getHotVideos(limit = 10): Promise<any[]> {
+  const data = await rawRequest<any>(
+    "/x/web-interface/popular",
+    { pn: 1, ps: Math.min(limit, 20) },
+    { includeAuth: false },
+  );
+  return Array.isArray(data?.list) ? data.list.slice(0, limit) : [];
+}
+
+export async function getBangumiTimeline(): Promise<any> {
+  return rawRequest(
+    "https://api.bilibili.com/pgc/web/timeline/v2",
+    { day_before: 2, day_after: 4 },
+    { includeAuth: false },
+  );
+}
+
+export async function getUpInfo(mid: number): Promise<any> {
+  return rawRequest("/x/space/wbi/acc/info", { mid }, { includeAuth: false, useWbi: true });
+}
+
+export async function getUpVideos(mid: number, page = 1, pageSize = 10): Promise<any> {
+  return rawRequest(
+    "/x/space/wbi/arc/search",
+    { mid, pn: page, ps: Math.min(pageSize, 20), order: "pubdate" },
+    { includeAuth: false, useWbi: true },
+  );
+}
+
+export async function getRelatedVideos(bvid: string): Promise<any[]> {
+  const data = await rawRequest<any>(
+    "/x/web-interface/archive/related",
+    { bvid },
+    { includeAuth: false },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getVideoSubtitle(bvid: string, cid: number): Promise<any> {
+  const data: any = await rawRequest(
+    "/x/player/wbi/v2",
+    { bvid, cid },
+    { includeAuth: true, useWbi: true, appendBuvid: true },
+  );
+  if (data?.subtitle?.subtitles?.length) {
+    return data;
+  }
+  return rawRequest(
+    "/x/player/v2",
+    { bvid, cid },
+    { includeAuth: true, useWbi: false, appendBuvid: true },
+  );
+}
+
+export async function getSubtitleContent(url: string): Promise<any> {
+  const fullUrl = url.startsWith("http") ? url : `https:${url}`;
+  const headers = await credentialManager.getAuthHeaders();
+  const response = await fetch(fullUrl, {
+    headers: {
+      "User-Agent": config.userAgent,
+      Referer: config.referer,
+      ...headers,
+    },
+  });
+
+  if (!response.ok) {
+    throw new NetworkError(
+      `字幕请求失败：HTTP ${response.status}`,
+      undefined,
+      fullUrl,
+      response.status,
+    );
+  }
+  return response.json();
+}
+
+export async function getVideoComments(
+  bvid: string,
+  page = 1,
+  pageSize = 20,
+  sort = 1,
+): Promise<any> {
+  const info = await getVideoInfoByBvid(bvid);
+  const oid = info.aid;
+
+  try {
+    return await rawRequest(
+      "/x/v2/reply/wbi/main",
+      { oid, type: 1, mode: 3, pn: page, ps: Math.min(pageSize, 20), sort },
+      {
+        includeAuth: true,
+        useWbi: true,
+        appendBuvid: true,
+        referer: `https://www.bilibili.com/video/${bvid}/`,
+      },
+    );
+  } catch (error) {
+    if (error instanceof BilibiliAPIError && error.code === "COMMENTS_DISABLED") {
+      throw new CommentsDisabledError();
+    }
+    return rawRequest(
+      "/x/v2/reply/main",
+      { oid, type: 1, mode: 3, pn: page, ps: Math.min(pageSize, 20), sort },
+      {
+        includeAuth: true,
+        appendBuvid: true,
+        referer: `https://www.bilibili.com/video/${bvid}/`,
+      },
+    );
+  }
+}
+
+export async function getDanmakuXml(cid: number): Promise<string> {
+  const url = `${config.commentBaseUrl}/${cid}.xml`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": config.userAgent,
+      Referer: config.referer,
+    },
+  });
+
+  if (!response.ok) {
+    throw new NetworkError(
+      `弹幕请求失败：HTTP ${response.status}`,
+      undefined,
+      url,
+      response.status,
+    );
+  }
+  return response.text();
+}

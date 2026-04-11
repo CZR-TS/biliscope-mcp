@@ -1,6 +1,6 @@
-name: bilibili-mcp
-version: 1.3.3
-description: Bilibili (B站) MCP 工具，用于总结视频内容（含字幕）和获取热门评论。
+name: biliscope-mcp
+version: 2.0.0
+description: Bilibili MCP with CookieCloud auto refresh and single JSON deployment
 
 runtime: node
 

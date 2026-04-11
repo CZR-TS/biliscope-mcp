@@ -1,156 +1,286 @@
-// 评论处理逻辑
-import { getVideoInfo, getVideoComments } from "./client.js";
-import { Comment, ProcessedComment, CommentsResponse, CommentDetailLevel } from "./types.js";
-import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
+import { extractBVId } from "../utils/bvid.js";
 import { CommentsDisabledError } from "../utils/errors.js";
+import {
+  getDanmakuXml,
+  getHotVideos,
+  getRelatedVideos,
+  getUpInfo,
+  getUpVideos,
+  getVideoComments,
+  searchVideos,
+} from "./client.js";
+import { resolveVideoInput } from "./subtitle.js";
 
-export interface CommentData {
-  comments: ProcessedComment[];
-  summary: {
-    total_comments: number;
-    comments_with_timestamp: number;
+function filterEmojis(text: string): string {
+  return text.replace(/\[[^\]]+\]/g, "").trim();
+}
+
+function extractTimestamp(text: string): string | null {
+  const matches = text.match(/\b(\d{1,2}:)?\d{1,2}:\d{2}\b/g);
+  return matches ? matches[0] : null;
+}
+
+function formatDuration(seconds: number | undefined): string | null {
+  if (!seconds || seconds < 0) {
+    return null;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remaining = seconds % 60;
+  if (hours > 0) {
+    return [hours, minutes, remaining].map((item) => String(item).padStart(2, "0")).join(":");
+  }
+  return [minutes, remaining].map((item) => String(item).padStart(2, "0")).join(":");
+}
+
+function stripHtml(value: string | undefined): string {
+  return (value || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeSearchItem(item: any) {
+  return {
+    title: stripHtml(item.title),
+    bvid: item.bvid,
+    url: item.bvid ? `https://www.bilibili.com/video/${item.bvid}` : undefined,
+    author: item.author,
+    play_count: item.play,
+    duration: item.duration || null,
+    publish_time: item.pubdate ? new Date(item.pubdate * 1000).toISOString() : undefined,
+    description: stripHtml(item.description),
   };
 }
 
-
-
-/**
- * 过滤表情占位符（如 [doge]）
- */
-function filterEmojis(text: string): string {
-  // 移除所有中括号包裹的表情占位符
-  return text.replace(/\[[a-zA-Z0-9_]+\]/g, "").trim();
+export async function searchVideoItems(keyword: string, page = 1, pageSize = 10) {
+  const data = await searchVideos(keyword, page, pageSize);
+  const list = Array.isArray(data?.result) ? data.result : [];
+  return {
+    keyword,
+    page,
+    page_size: pageSize,
+    total: data?.numResults ?? list.length,
+    items: list.slice(0, pageSize).map(normalizeSearchItem),
+  };
 }
 
-/**
- * 检测评论中是否包含时间戳
- */
-function extractTimestamp(text: string): string | null {
-  // 匹配时间戳格式，如 05:20, 1:23:45, 00:10 等
-  const timestampRegex = /\b(\d{1,2}:)?\d{1,2}:\d{2}\b/g;
-  const matches = text.match(timestampRegex);
-
-  if (matches) {
-    // 返回第一个匹配的时间戳
-    return matches[0];
+export async function getVideoCommentsData(
+  input: string,
+  detailLevel: "brief" | "detailed" = "brief",
+) {
+  const bvid = extractBVId(input);
+  const cacheKey = cacheManager.generateKey("comments", bvid, detailLevel);
+  const cached = cacheManager.getCommentInfo(cacheKey);
+  if (cached) {
+    return cached;
   }
 
-  return null;
-}
-
-/**
- * 处理单条评论
- */
-function processComment(
-  comment: Comment,
-  includeReplies: boolean = false
-): ProcessedComment {
-  const author = comment.member?.uname || "匿名用户";
-  const rawContent = comment.content?.message || "";
-  const filteredContent = filterEmojis(rawContent);
-  const likes = comment.like || 0;
-  const timestamp = extractTimestamp(filteredContent);
-
-  return {
-    author,
-    content: filteredContent,
-    likes,
-    has_timestamp: !!timestamp,
-    timestamp: timestamp || undefined,
-  };
-}
-
-/**
- * 获取视频评论
- */
-export async function getVideoCommentsData(
-  bvidOrUrl: string,
-  detailLevel: CommentDetailLevel = "brief",
-  sort: number = 1, // 0按时间，1按热度
-  includeReplies: boolean = true
-): Promise<CommentData> {
-  const bvid = extractBVId(bvidOrUrl);
-  
-  // 生成缓存键
-  const cacheKey = cacheManager.generateKey('comments', bvid, detailLevel, sort.toString(), includeReplies.toString());
-  
   try {
-    // 尝试从缓存获取
-    const cachedData = cacheManager.getCommentInfo(cacheKey);
-    if (cachedData) {
-      console.error(`Cache hit for comments ${bvid}`);
-      return cachedData;
-    }
+    const pageSize = detailLevel === "brief" ? 10 : 20;
+    const response = await getVideoComments(bvid, 1, pageSize, 1);
+    const rawComments = Array.isArray(response?.replies) ? response.replies : [];
 
-    console.error(`Cache miss for comments ${bvid}, fetching from API`);
+    const comments = rawComments.flatMap((comment: any) => {
+      const mainContent = filterEmojis(comment?.content?.message || "");
+      const timestamp = extractTimestamp(mainContent);
+      const normalized = {
+        author: comment?.member?.uname || "匿名用户",
+        content: mainContent,
+        likes: comment?.like || 0,
+        has_timestamp: Boolean(timestamp),
+        timestamp: timestamp || undefined,
+      };
 
-    // 获取视频基本信息以获取 CID
-    const videoData = await getVideoInfo(bvid);
-    const cid = videoData.cid;
-
-    // 根据详情级别确定评论数量
-    const commentCount = detailLevel === "brief" ? 10 : 20;
-
-    // 获取评论
-    const commentsData = await getVideoComments(bvidOrUrl, 1, commentCount, sort, includeReplies) as CommentsResponse;
-
-    const rawComments = commentsData?.replies || [];
-
-    // 处理评论
-    let processedComments = rawComments.map((comment) => processComment(comment, includeReplies));
-
-    // 如果是详细模式且包含回复，添加高赞回复
-    if (detailLevel === "detailed" && includeReplies) {
-      const replies: Comment[] = [];
-      for (const comment of rawComments) {
-        if (comment.replies && comment.replies.length > 0) {
-          // 取前3条高赞回复
-          const topReplies = comment.replies.slice(0, 3);
-          replies.push(...topReplies);
-        }
+      if (detailLevel !== "detailed" || !Array.isArray(comment?.replies)) {
+        return [normalized];
       }
-      const processedReplies = replies.map((reply) => processComment(reply));
-      processedComments.push(...processedReplies);
-    }
 
-    // 优先排序：有时间戳的评论排在前面
-    processedComments.sort((a, b) => {
-      if (a.has_timestamp && !b.has_timestamp) return -1;
-      if (!a.has_timestamp && b.has_timestamp) return 1;
-      return b.likes - a.likes; // 都有或都没有时间戳，按点赞数排序
+      const replies = comment.replies.slice(0, 3).map((reply: any) => {
+        const replyContent = filterEmojis(reply?.content?.message || "");
+        const replyTimestamp = extractTimestamp(replyContent);
+        return {
+          author: reply?.member?.uname || "匿名用户",
+          content: replyContent,
+          likes: reply?.like || 0,
+          has_timestamp: Boolean(replyTimestamp),
+          timestamp: replyTimestamp || undefined,
+        };
+      });
+
+      return [normalized, ...replies];
     });
 
-    // 统计
-    const commentsWithTimestamp = processedComments.filter((c) => c.has_timestamp).length;
+    comments.sort((left: any, right: any) => {
+      if (left.has_timestamp && !right.has_timestamp) return -1;
+      if (!left.has_timestamp && right.has_timestamp) return 1;
+      return right.likes - left.likes;
+    });
 
-    const result: CommentData = {
-      comments: processedComments,
+    const result = {
+      comments,
       summary: {
-        total_comments: processedComments.length,
-        comments_with_timestamp: commentsWithTimestamp,
+        total_comments: comments.length,
+        comments_with_timestamp: comments.filter((item: any) => item.has_timestamp).length,
       },
     };
-
-    // 存入缓存
     cacheManager.setCommentInfo(cacheKey, result);
-    
     return result;
   } catch (error) {
     if (error instanceof CommentsDisabledError) {
-      console.error(`Comments disabled for video ${bvid}`);
-      const result: CommentData = {
+      return {
         comments: [],
         summary: {
           total_comments: 0,
           comments_with_timestamp: 0,
         },
       };
-      // 存入缓存
-      cacheManager.setCommentInfo(cacheKey, result);
-      return result;
     }
-    console.error("Error getting video comments:", error);
     throw error;
   }
+}
+
+export async function getVideoDanmaku(input: string, limit = 100) {
+  const video = await resolveVideoInput(input);
+  const xml = await getDanmakuXml(video.cid);
+  const matches = [...xml.matchAll(/<d p="([^"]+)">([\s\S]*?)<\/d>/g)];
+  const items = matches.slice(0, Math.min(limit, 200)).map((match) => {
+    const [time] = match[1].split(",");
+    return {
+      time_seconds: Number(time),
+      time_text: formatDuration(Math.floor(Number(time))),
+      content: match[2]
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"'),
+    };
+  });
+
+  return {
+    bvid: video.bvid,
+    cid: video.cid,
+    total: matches.length,
+    returned: items.length,
+    truncated: matches.length > items.length,
+    items,
+  };
+}
+
+export async function getVideoDetail(input: string) {
+  const video = await resolveVideoInput(input);
+  return {
+    title: video.title,
+    bvid: video.bvid,
+    aid: video.aid,
+    cid: video.cid,
+    url: `https://www.bilibili.com/video/${video.bvid}`,
+    description: video.desc || "",
+    cover: video.pic,
+    author: {
+      name: video.owner?.name,
+      mid: video.owner?.mid,
+      avatar: video.owner?.face,
+    },
+    duration_seconds: video.duration,
+    duration_text: formatDuration(video.duration),
+    publish_time: video.pubdate ? new Date(video.pubdate * 1000).toISOString() : undefined,
+    statistics: {
+      view: video.stat?.view ?? 0,
+      danmaku: video.stat?.danmaku ?? 0,
+      reply: video.stat?.reply ?? 0,
+      favorite: video.stat?.favorite ?? 0,
+      coin: video.stat?.coin ?? 0,
+      share: video.stat?.share ?? 0,
+      like: video.stat?.like ?? 0,
+    },
+    tags: Array.isArray(video.tag) ? video.tag.map((item: any) => item.tag_name) : [],
+    pages: Array.isArray(video.pages)
+      ? video.pages.map((page: any) => ({
+          page: page.page,
+          cid: page.cid,
+          part: page.part,
+          duration_seconds: page.duration,
+          duration_text: formatDuration(page.duration),
+        }))
+      : [],
+    login_required: Boolean(video.need_login_subtitle),
+  };
+}
+
+export async function getHotVideoItems(limit = 10) {
+  const items = await getHotVideos(limit);
+  return {
+    total: items.length,
+    items: items.map((item) => ({
+      title: item.title,
+      bvid: item.bvid,
+      url: `https://www.bilibili.com/video/${item.bvid}`,
+      author: item.owner?.name,
+      play_count: item.stat?.view ?? 0,
+      duration: formatDuration(item.duration),
+      publish_time: item.pubdate ? new Date(item.pubdate * 1000).toISOString() : undefined,
+      description: item.desc || "",
+    })),
+  };
+}
+
+export async function getUpInfoData(midInput: string) {
+  const midMatch = midInput.match(/(\d{2,})/);
+  if (!midMatch) {
+    throw new Error("无法从输入中解析 UP 主 mid。请传入 mid 或空间链接。");
+  }
+
+  const mid = Number(midMatch[1]);
+  const [info, videos] = await Promise.all([getUpInfo(mid), getUpVideos(mid, 1, 6)]);
+  const list = Array.isArray(videos?.list?.vlist) ? videos.list.vlist : [];
+
+  return {
+    mid,
+    name: info?.name,
+    face: info?.face,
+    sign: info?.sign,
+    level: info?.level,
+    fans: info?.follower,
+    following: info?.following,
+    archive_count: videos?.page?.count ?? list.length,
+    recent_videos: list.slice(0, 6).map((item: any) => ({
+      title: item.title,
+      bvid: item.bvid,
+      url: `https://www.bilibili.com/video/${item.bvid}`,
+      description: item.description || "",
+      play_count: item.play ?? 0,
+      publish_time: item.created ? new Date(item.created * 1000).toISOString() : undefined,
+    })),
+  };
+}
+
+export async function getRelatedVideoItems(input: string) {
+  const bvid = extractBVId(input);
+  const items = await getRelatedVideos(bvid);
+  return {
+    bvid,
+    total: items.length,
+    items: items.slice(0, 10).map((item) => ({
+      title: item.title,
+      bvid: item.bvid,
+      url: `https://www.bilibili.com/video/${item.bvid}`,
+      author: item.owner?.name,
+      play_count: item.stat?.view ?? 0,
+      duration: formatDuration(item.duration),
+    })),
+  };
+}
+
+export async function getResolvedVideoData(input: string) {
+  const video = await resolveVideoInput(input);
+  return {
+    title: video.title,
+    bvid: video.bvid,
+    aid: video.aid,
+    url: `https://www.bilibili.com/video/${video.bvid}`,
+    author: video.owner?.name,
+    duration: formatDuration(video.duration),
+    publish_time: video.pubdate ? new Date(video.pubdate * 1000).toISOString() : undefined,
+    description: video.desc || "",
+  };
 }

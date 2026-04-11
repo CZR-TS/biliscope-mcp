@@ -1,28 +1,138 @@
-/**
- * 凭证管理模块
- * 用于安全地存储和管理用户的登录凭证
- */
+import { createDecipheriv, createHash } from "crypto";
+import { config, validateRuntimeConfig } from "../config.js";
+import { BilibiliAPIError, NetworkError } from "./errors.js";
+import { logger } from "./logger.js";
 
-import fs from "fs";
-import path from "path";
-import os from "os";
-
-export interface BilibiliCredentials {
-  sessdata: string;
-  bili_jct: string;
-  dedeuserid: string;
-  expiresAt: number;
+export interface CookieCloudCookie {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  hostOnly?: boolean;
 }
 
-/** 全局配置文件路径: ~/.bilibili-mcp/config.json */
-export const GLOBAL_CONFIG_DIR = path.join(os.homedir(), ".bilibili-mcp");
-export const GLOBAL_CONFIG_FILE = path.join(GLOBAL_CONFIG_DIR, "config.json");
+export interface BilibiliCredentials {
+  cookieHeader: string;
+  cookies: CookieCloudCookie[];
+  refreshAt: number;
+  refreshedAt: number;
+}
+
+function md5Hex(input: string): string {
+  return createHash("md5").update(input).digest("hex");
+}
+
+function evpBytesToKey(password: Buffer, salt: Buffer, keyLen: number, ivLen: number) {
+  const buffers: Buffer[] = [];
+  let previous = Buffer.alloc(0);
+
+  while (Buffer.concat(buffers).length < keyLen + ivLen) {
+    const hash = createHash("md5");
+    hash.update(previous);
+    hash.update(password);
+    hash.update(salt);
+    previous = hash.digest();
+    buffers.push(previous);
+  }
+
+  const material = Buffer.concat(buffers);
+  return {
+    key: material.subarray(0, keyLen),
+    iv: material.subarray(keyLen, keyLen + ivLen),
+  };
+}
+
+function decryptCryptoJSAes(encrypted: string, passphrase: string): string {
+  const raw = Buffer.from(encrypted, "base64");
+  if (raw.subarray(0, 8).toString("utf8") !== "Salted__") {
+    throw new Error("CookieCloud 密文格式不正确。");
+  }
+
+  const salt = raw.subarray(8, 16);
+  const ciphertext = raw.subarray(16);
+  const { key, iv } = evpBytesToKey(Buffer.from(passphrase, "utf8"), salt, 32, 16);
+
+  const decipher = createDecipheriv("aes-256-cbc", key, iv);
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return decrypted.toString("utf8");
+}
+
+function matchesDomainKeyword(domain: string | undefined, keywords: string[]): boolean {
+  const normalized = (domain || "").toLowerCase();
+  return keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
+}
+
+function normalizeCookieEntries(rawCookieData: unknown): CookieCloudCookie[] {
+  if (Array.isArray(rawCookieData)) {
+    return rawCookieData.filter(Boolean) as CookieCloudCookie[];
+  }
+
+  if (rawCookieData && typeof rawCookieData === "object") {
+    return Object.values(rawCookieData as Record<string, unknown>).flatMap((item) =>
+      normalizeCookieEntries(item),
+    );
+  }
+
+  return [];
+}
+
+function buildCookieHeader(cookies: CookieCloudCookie[]): string {
+  const deduped = new Map<string, string>();
+  for (const cookie of cookies) {
+    if (cookie.name && typeof cookie.value === "string") {
+      deduped.set(cookie.name, cookie.value);
+    }
+  }
+
+  return [...deduped.entries()]
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
+
+function ensureRequiredBilibiliCookies(header: string): void {
+  const required = ["SESSDATA=", "bili_jct=", "DedeUserID="];
+  const missing = required.filter((item) => !header.includes(item));
+  if (missing.length > 0) {
+    throw new BilibiliAPIError(
+      `CookieCloud 返回的 B 站 Cookie 不完整，缺少 ${missing.join(", ")}。`,
+      "BILIBILI_COOKIE_INVALID",
+      undefined,
+      undefined,
+      false,
+      "请确认浏览器已登录 B 站，并且 CookieCloud 同步域名包含 bilibili.com。",
+    );
+  }
+}
+
+function extractEncryptedPayload(payload: any): string {
+  if (typeof payload?.encrypted === "string") {
+    return payload.encrypted;
+  }
+  if (typeof payload?.data?.encrypted === "string") {
+    return payload.data.encrypted;
+  }
+  if (typeof payload === "string") {
+    return payload;
+  }
+
+  throw new BilibiliAPIError(
+    "CookieCloud 返回内容中缺少 encrypted 字段。",
+    "COOKIECLOUD_FETCH_FAILED",
+    undefined,
+    payload,
+    true,
+    "请检查 CookieCloud 服务是否兼容官方接口。",
+  );
+}
+
+function normalizeEndpoint(endpoint: string): string {
+  return endpoint.endsWith("/") ? endpoint : `${endpoint}/`;
+}
 
 export class CredentialManager {
   private static instance: CredentialManager;
   private credentials: BilibiliCredentials | null = null;
-
-  private constructor() {}
+  private refreshPromise: Promise<BilibiliCredentials> | null = null;
 
   static getInstance(): CredentialManager {
     if (!CredentialManager.instance) {
@@ -31,150 +141,151 @@ export class CredentialManager {
     return CredentialManager.instance;
   }
 
-  /**
-   * 从环境变量加载凭证
-   */
-  loadFromEnv(): BilibiliCredentials | null {
-    const sessdata = process.env.BILIBILI_SESSDATA;
-    const bili_jct = process.env.BILIBILI_BILI_JCT;
-    const dedeuserid = process.env.BILIBILI_DEDEUSERID;
-
-    if (!sessdata || !bili_jct || !dedeuserid) {
-      return null;
-    }
-
-    this.credentials = {
-      sessdata,
-      bili_jct,
-      dedeuserid,
-      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30天过期
-    };
-
-    return this.credentials;
+  async initialize(): Promise<void> {
+    validateRuntimeConfig();
+    await this.refreshCredentials(true);
   }
 
-  /**
-   * 从全局配置文件加载凭证 (~/.bilibili-mcp/config.json)
-   */
-  loadFromFile(): BilibiliCredentials | null {
-    try {
-      if (!fs.existsSync(GLOBAL_CONFIG_FILE)) {
-        return null;
-      }
-      const raw = fs.readFileSync(GLOBAL_CONFIG_FILE, "utf-8");
-      const parsed = JSON.parse(raw) as BilibiliCredentials;
-      if (!parsed.sessdata || !parsed.bili_jct || !parsed.dedeuserid) {
-        return null;
-      }
-      this.credentials = parsed;
-      return this.credentials;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * 将当前凭证持久化保存至全局配置文件
-   */
-  saveToFile(credentials: BilibiliCredentials): void {
-    if (!fs.existsSync(GLOBAL_CONFIG_DIR)) {
-      fs.mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true });
-    }
-    fs.writeFileSync(
-      GLOBAL_CONFIG_FILE,
-      JSON.stringify(credentials, null, 2),
-      "utf-8",
-    );
-  }
-
-  /**
-   * 设置凭证
-   */
-  setCredentials(credentials: BilibiliCredentials): void {
-    this.credentials = credentials;
-  }
-
-  /**
-   * 获取凭证（优先级：内存 > 环境变量 > 全局配置文件）
-   */
-  getCredentials(): BilibiliCredentials | null {
-    if (!this.credentials) {
-      this.loadFromEnv();
-    }
-
-    if (!this.credentials) {
-      this.loadFromFile();
-    }
-
-    if (!this.credentials) {
-      return null;
-    }
-
-    if (this.isExpired()) {
-      console.warn("Credentials have expired");
-      this.credentials = null;
-      return null;
-    }
-
-    return this.credentials;
-  }
-
-  /**
-   * 检查凭证是否过期
-   */
-  isExpired(): boolean {
-    if (!this.credentials) {
-      return true;
-    }
-    return Date.now() > this.credentials.expiresAt;
-  }
-
-  /**
-   * 检查凭证是否即将过期（7天内）
-   */
-  isExpiringSoon(): boolean {
-    if (!this.credentials) {
-      return true;
-    }
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    return Date.now() > this.credentials.expiresAt - sevenDays;
-  }
-
-  /**
-   * 刷新凭证过期时间
-   */
-  refreshExpiration(): void {
-    if (this.credentials) {
-      this.credentials.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-    }
-  }
-
-  /**
-   * 清除凭证
-   */
-  clearCredentials(): void {
-    this.credentials = null;
-  }
-
-  /**
-   * 检查是否已登录
-   */
-  isLoggedIn(): boolean {
-    const creds = this.getCredentials();
-    return creds !== null && !this.isExpired();
-  }
-
-  /**
-   * 获取请求头
-   */
-  getAuthHeaders(): Record<string, string> {
-    const creds = this.getCredentials();
-    if (!creds) {
-      return {};
-    }
-
+  getStatus() {
     return {
-      Cookie: `SESSDATA=${creds.sessdata}; bili_jct=${creds.bili_jct}; DedeUserID=${creds.dedeuserid}`,
+      source: "cookiecloud" as const,
+      endpoint: config.cookieCloudEndpoint,
+      refreshIntervalMinutes: config.cookieRefreshIntervalMinutes,
+      refreshedAt: this.credentials?.refreshedAt ?? null,
+      hasCredentials: Boolean(this.credentials?.cookieHeader),
+    };
+  }
+
+  private shouldRefresh(): boolean {
+    if (!this.credentials) {
+      return true;
+    }
+    return Date.now() >= this.credentials.refreshAt;
+  }
+
+  async getAuthHeaders(forceRefresh: boolean = false): Promise<Record<string, string>> {
+    if (forceRefresh || this.shouldRefresh()) {
+      await this.refreshCredentials(forceRefresh);
+    }
+
+    if (!this.credentials) {
+      throw new BilibiliAPIError(
+        "当前没有可用的 B 站 Cookie。",
+        "BILIBILI_COOKIE_INVALID",
+        undefined,
+        undefined,
+        false,
+        "请检查 CookieCloud 是否已同步到最新的 B 站登录态。",
+      );
+    }
+
+    return { Cookie: this.credentials.cookieHeader };
+  }
+
+  async refreshCredentials(force: boolean = false): Promise<BilibiliCredentials> {
+    if (!force && !this.shouldRefresh() && this.credentials) {
+      return this.credentials;
+    }
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.fetchFromCookieCloud()
+      .then((credentials) => {
+        this.credentials = credentials;
+        return credentials;
+      })
+      .finally(() => {
+        this.refreshPromise = null;
+      });
+
+    return this.refreshPromise;
+  }
+
+  async markAuthFailureAndRefresh(): Promise<void> {
+    await this.refreshCredentials(true);
+  }
+
+  private async fetchFromCookieCloud(): Promise<BilibiliCredentials> {
+    const endpoint = new URL(
+      `get/${encodeURIComponent(config.cookieCloudUuid)}`,
+      normalizeEndpoint(config.cookieCloudEndpoint),
+    ).toString();
+
+    logger.info("Fetching credentials from CookieCloud", {
+      endpoint,
+      domains: config.cookieCloudDomains,
+    });
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+    } catch (error) {
+      throw new NetworkError(
+        "无法连接 CookieCloud 服务。",
+        error instanceof Error ? error : undefined,
+        endpoint,
+      );
+    }
+
+    if (!response.ok) {
+      throw new BilibiliAPIError(
+        `CookieCloud 请求失败，HTTP ${response.status}。`,
+        "COOKIECLOUD_FETCH_FAILED",
+        response.status,
+        undefined,
+        true,
+        "请检查 CookieCloud 服务地址、反代配置或访问权限。",
+      );
+    }
+
+    const payload = await response.json();
+    const encrypted = extractEncryptedPayload(payload);
+
+    let decryptedText: string;
+    try {
+      const passphrase = md5Hex(
+        `${config.cookieCloudUuid}-${config.cookieCloudPassword}`,
+      ).substring(0, 16);
+      decryptedText = decryptCryptoJSAes(encrypted, passphrase);
+    } catch (error) {
+      throw new BilibiliAPIError(
+        "CookieCloud 解密失败，请检查 UUID 或密码是否正确。",
+        "COOKIECLOUD_DECRYPT_FAILED",
+        undefined,
+        error,
+        false,
+        "请确认使用的是浏览器插件中的“用户KEY·UUID”和“端对端加密密码”。",
+      );
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(decryptedText);
+    } catch (error) {
+      throw new BilibiliAPIError(
+        "CookieCloud 解密成功，但返回内容不是有效 JSON。",
+        "COOKIECLOUD_DECRYPT_FAILED",
+        undefined,
+        error,
+        false,
+        "请检查 CookieCloud 服务是否被额外包装或篡改。",
+      );
+    }
+
+    const normalizedCookies = normalizeCookieEntries(parsed?.cookie_data ?? parsed).filter(
+      (cookie) => matchesDomainKeyword(cookie.domain, config.cookieCloudDomains),
+    );
+
+    const cookieHeader = buildCookieHeader(normalizedCookies);
+    ensureRequiredBilibiliCookies(cookieHeader);
+
+    const now = Date.now();
+    return {
+      cookies: normalizedCookies,
+      cookieHeader,
+      refreshedAt: now,
+      refreshAt: now + config.cookieRefreshIntervalMinutes * 60 * 1000,
     };
   }
 }

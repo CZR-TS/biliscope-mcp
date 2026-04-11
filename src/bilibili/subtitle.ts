@@ -1,242 +1,244 @@
-// 字幕处理逻辑
-import { getVideoInfo, getVideoSubtitle, getSubtitleContent, checkLoginStatus } from "./client.js";
-import { extractBVId } from "../utils/bvid.js";
+import {
+  checkLoginStatus,
+  getSubtitleContent,
+  getVideoInfoByAid,
+  getVideoInfoByBvid,
+  getVideoSubtitle,
+  searchVideos,
+} from "./client.js";
 import { cacheManager } from "../utils/cache.js";
-import { BilibiliAPIError, PaidVideoError } from "../utils/errors.js";
+import { extractBVId } from "../utils/bvid.js";
+import { BilibiliAPIError } from "../utils/errors.js";
 
-
-export interface SubtitleData {
-  data_source: "subtitle" | "description";
-  video_info: {
-    title: string;
-    description: string;
-    tags: string[];
-    subtitle_text?: string;
-    pubdate?: string;  // ISO 8601 格式的发布日期
-    pubdate_timestamp?: number;  // Unix 时间戳
-  };
-}
-
-/**
- * 字幕语言优先级
- */
 const LANGUAGE_PRIORITY = ["zh-Hans", "ai-zh", "zh-CN", "zh-Hant", "en"];
 
-/**
- * 将 Unix 时间戳转换为 ISO 8601 格式日期字符串
- */
-function formatPublishDate(timestamp: number): string {
-  const date = new Date(timestamp * 1000); // B站返回的是秒级时间戳
-  return date.toISOString();
+function formatPublishDate(timestamp: number | undefined): string | undefined {
+  if (!timestamp) {
+    return undefined;
+  }
+  return new Date(timestamp * 1000).toISOString();
 }
 
+function extractTags(videoData: any): string[] {
+  if (!Array.isArray(videoData?.tag)) {
+    return [];
+  }
+  return videoData.tag.map((item: any) => item.tag_name).filter(Boolean);
+}
 
-
-/**
- * 选择最佳字幕语言
- */
 function selectBestSubtitle(
   subtitles: Array<{ id: number; lan: string; lan_doc: string; subtitle_url: string }>,
-  preferredLang?: string
-): { id: number; lan: string; lan_doc: string; subtitle_url: string } | null {
-  if (!subtitles || subtitles.length === 0) {
+  preferredLang?: string,
+) {
+  if (!Array.isArray(subtitles) || subtitles.length === 0) {
     return null;
   }
 
-  // 如果用户指定了偏好语言，优先使用
   if (preferredLang) {
-    const preferred = subtitles.find((s) => s.lan === preferredLang || s.lan_doc.includes(preferredLang));
-    if (preferred) {
-      return preferred;
+    const exact = subtitles.find(
+      (item) => item.lan === preferredLang || item.lan_doc.includes(preferredLang),
+    );
+    if (exact) {
+      return exact;
     }
   }
 
-  // 按优先级选择
   for (const lang of LANGUAGE_PRIORITY) {
-    const subtitle = subtitles.find((s) => s.lan === lang || s.lan.includes(lang));
-    if (subtitle) {
-      return subtitle;
+    const matched = subtitles.find(
+      (item) => item.lan === lang || item.lan.includes(lang),
+    );
+    if (matched) {
+      return matched;
     }
   }
 
-  // 如果没有匹配的语言，返回第一个
   return subtitles[0];
 }
 
-/**
- * 合并字幕内容为文本
- */
-function mergeSubtitleText(
-  body: Array<{ from: number; to: number; content: string }>
-): string {
-  return body.map((item) => item.content).join("\n");
+function mergeSubtitleBody(body: Array<{ from: number; to: number; content: string }>): string {
+  return body.map((item) => item.content.trim()).filter(Boolean).join("\n");
 }
 
-/**
- * 提取视频标签
- */
-function extractTags(videoData: any): string[] {
-  const tags = videoData.tag || [];
-  return tags.map((tag: { tag_name: string }) => tag.tag_name);
-}
-
-/**
- * 获取视频信息及字幕
- */
-export async function getVideoInfoWithSubtitle(
-  bvidOrUrl: string,
-  preferredLang?: string
-): Promise<SubtitleData> {
+export async function resolveVideoInput(input: string): Promise<any> {
   try {
-    const bvid = extractBVId(bvidOrUrl);
-    
-    // 生成缓存键
-    const cacheKey = cacheManager.generateKey('video', bvid, preferredLang);
-    
-    // 尝试从缓存获取
-    const cachedData = cacheManager.getVideoInfo(cacheKey);
-    if (cachedData) {
-      console.error(`Cache hit for video ${bvid}`);
-      return cachedData;
+    const bvid = extractBVId(input);
+    return getVideoInfoByBvid(bvid);
+  } catch {
+    const avMatch = input.match(/(?:^|\/|av)(\d{5,})/i);
+    if (avMatch) {
+      return getVideoInfoByAid(Number(avMatch[1]));
     }
 
-    console.error(`Cache miss for video ${bvid}, fetching from API`);
-
-    // 获取视频基本信息
-    const videoData = await getVideoInfo(bvid) as any;
-
-    const title = videoData.title;
-    const description = videoData.desc || "";
-    const tags = extractTags(videoData);
-    const cid = videoData.cid;
-    const pubdate = videoData.pubdate;  // Unix 时间戳（秒）
-    const formattedDate = pubdate ? formatPublishDate(pubdate) : undefined;
-
-    // 移除对付费视频的硬性拦截，因为即使是需要登录或付费的视频，API 有时也会返回 AI 字幕（至少登录状态下提供）
-    // 旧逻辑会在这里直接退出并返回描述，现在我们让它继续尝试去调取 subtitle 接口。
-    if (videoData.need_login_subtitle || videoData.preview_toast?.includes("付费")) {
-      console.warn(`Video ${bvid} has 'need_login_subtitle' or '付费' flag. Will still attempt to fetch subtitles.`);
-      // 仅用于调试，不中断流程
+    const result = await searchVideos(input, 1, 1);
+    const first = result?.result?.[0];
+    if (!first?.bvid) {
+      throw new BilibiliAPIError(
+        "没有找到匹配的视频。",
+        "VIDEO_NOT_FOUND",
+        undefined,
+        result,
+        false,
+        "请改用更具体的关键词，或直接传入 BV 号/视频链接。",
+      );
     }
+    return getVideoInfoByBvid(first.bvid);
+  }
+}
 
-    // 尝试获取字幕
-    try {
-      const subtitleData = await getVideoSubtitle(bvid, cid);
+export async function getResolvedVideoSummary(input: string): Promise<any> {
+  const video = await resolveVideoInput(input);
+  return {
+    title: video.title,
+    bvid: video.bvid,
+    aid: video.aid,
+    cid: video.cid,
+    url: `https://www.bilibili.com/video/${video.bvid}`,
+    author: video.owner?.name,
+    description: video.desc || "",
+    duration: video.duration,
+    publish_time: formatPublishDate(video.pubdate),
+  };
+}
 
-      if (!subtitleData?.subtitle?.subtitles || subtitleData.subtitle.subtitles.length === 0) {
-        // 字幕列表为空。主动调用 /x/web-interface/nav 验证登录状态。
-        // 理由：B站不会因 Cookie 无效就返回 -101，而是静默降级——字幕列表返回空。
-        // 通过核实登录状态，我们可以区分两种情况：
-        //   1. 已登录但视频确实无字幕 → 合法降级
-        //   2. 未登录（Cookie 过期）→ 抛出明确错误，拒绝静默降级
-        console.error(`No subtitles for video ${bvid}. Verifying login status...`);
-        const { isLogin } = await checkLoginStatus();
-        if (!isLogin) {
-          throw new BilibiliAPIError(
-            `视频 ${bvid} 的字幕获取为空，经核实当前 Bilibili Cookie 已失效（未登录），请更新 .env 中的 SESSDATA 等配置。`,
-            'COOKIE_EXPIRED',
-            undefined,
-            { code: -101, bvid }
-          );
-        }
+export async function getVideoInfoWithSubtitle(
+  input: string,
+  preferredLang?: string,
+): Promise<any> {
+  const cacheKey = cacheManager.generateKey("video-info", input, preferredLang ?? "default");
+  const cached = cacheManager.getVideoInfo(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
-        // 已登录但视频本身无字幕，使用简介降级
-        console.error(`No subtitles available for video ${bvid} (logged in, video has no subtitles)`);
+  const videoData = await resolveVideoInput(input);
+  const title = videoData.title;
+  const description = videoData.desc || "";
+  const tags = extractTags(videoData);
+  const cid = videoData.cid;
+  const pubdate = videoData.pubdate;
+  const pages = Array.isArray(videoData.pages)
+    ? videoData.pages.map((page: any) => ({
+        page: page.page,
+        part: page.part,
+        cid: page.cid,
+        duration: page.duration,
+      }))
+    : [];
 
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
-        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
-        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
-        return result;
+  try {
+    const subtitleData = await getVideoSubtitle(videoData.bvid, cid);
+    const subtitles = subtitleData?.subtitle?.subtitles ?? [];
+    if (subtitles.length === 0) {
+      const login = await checkLoginStatus();
+      if (!login.isLogin) {
+        throw new BilibiliAPIError(
+          "当前 B 站登录态无效，无法获取字幕。",
+          "BILIBILI_COOKIE_INVALID",
+          undefined,
+          { bvid: videoData.bvid },
+          true,
+          "请确认 CookieCloud 中的 B 站登录态仍然有效。",
+        );
       }
 
-      // 选择最佳字幕
-      const bestSubtitle = selectBestSubtitle(subtitleData.subtitle.subtitles, preferredLang);
-
-      if (!bestSubtitle) {
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
-        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
-        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
-        return result;
-      }
-
-      // 获取字幕内容
-      const subtitleContent = await getSubtitleContent(bestSubtitle.subtitle_url);
-
-      if (!subtitleContent?.body || subtitleContent.body.length === 0) {
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
-        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
-        console.error(`Not caching fallback result for video ${bvid} to allow future retries.`);
-        return result;
-      }
-
-      // 合并字幕文本
-      const subtitleText = mergeSubtitleText(subtitleContent.body);
-
-      const result: SubtitleData = {
-        data_source: "subtitle",
-        video_info: {
-          title,
-          description,
-          tags,
-          subtitle_text: subtitleText,
-          pubdate: formattedDate,
-          pubdate_timestamp: pubdate,
-        },
-      };
-      // 存入缓存
-      cacheManager.setVideoInfo(cacheKey, result);
-      return result;
-    } catch (error) {
-      // COOKIE_EXPIRED 错误必须向上传播，不能静默降级
-      if (error instanceof BilibiliAPIError && error.code === 'COOKIE_EXPIRED') {
-        throw error;
-      }
-      // 其他字幕获取失败，使用简介作为降级方案
-      console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error instanceof Error ? error.message : error);
-
-      const result: SubtitleData = {
+      const fallback = {
         data_source: "description",
         video_info: {
           title,
-          description: description || "该视频没有可用的简介",
-          tags: tags.length > 0 ? tags : ["无标签"],
-          pubdate: formattedDate,
-          pubdate_timestamp: pubdate,
+          bvid: videoData.bvid,
+          url: `https://www.bilibili.com/video/${videoData.bvid}`,
+          author: videoData.owner?.name,
+          description,
+          tags,
+          publish_time: formatPublishDate(pubdate),
+          publish_timestamp: pubdate,
+          statistics: {
+            view: videoData.stat?.view ?? 0,
+            danmaku: videoData.stat?.danmaku ?? 0,
+            reply: videoData.stat?.reply ?? 0,
+            like: videoData.stat?.like ?? 0,
+          },
+          pages,
+          login_required: Boolean(videoData.need_login_subtitle),
         },
       };
-      // 成功获取到字幕，存入缓存
-      cacheManager.setVideoInfo(cacheKey, result);
-      return result;
+      cacheManager.setVideoInfo(cacheKey, fallback);
+      return fallback;
     }
+
+    const selected = selectBestSubtitle(subtitles, preferredLang);
+    if (!selected) {
+      throw new BilibiliAPIError(
+        "字幕列表为空。",
+        "SUBTITLE_NOT_FOUND",
+        undefined,
+        subtitleData,
+        false,
+        "该视频可能没有可用字幕。",
+      );
+    }
+
+    const content = await getSubtitleContent(selected.subtitle_url);
+    const subtitleBody = Array.isArray(content?.body) ? content.body : [];
+    const result = {
+      data_source: "subtitle",
+      video_info: {
+        title,
+        bvid: videoData.bvid,
+        url: `https://www.bilibili.com/video/${videoData.bvid}`,
+        author: videoData.owner?.name,
+        description,
+        tags,
+        publish_time: formatPublishDate(pubdate),
+        publish_timestamp: pubdate,
+        subtitle_language: selected.lan,
+        subtitle_language_label: selected.lan_doc,
+        subtitle_text: mergeSubtitleBody(subtitleBody),
+        subtitle_segments: subtitleBody.map((item: any) => ({
+          from: item.from,
+          to: item.to,
+          content: item.content,
+        })),
+        statistics: {
+          view: videoData.stat?.view ?? 0,
+          danmaku: videoData.stat?.danmaku ?? 0,
+          reply: videoData.stat?.reply ?? 0,
+          like: videoData.stat?.like ?? 0,
+        },
+        pages,
+        login_required: Boolean(videoData.need_login_subtitle),
+      },
+    };
+
+    cacheManager.setVideoInfo(cacheKey, result);
+    return result;
   } catch (error) {
-    console.error("Error getting video info with subtitle:", error);
-    throw error;
+    if (error instanceof BilibiliAPIError) {
+      throw error;
+    }
+
+    const fallback = {
+      data_source: "description",
+      video_info: {
+        title,
+        bvid: videoData.bvid,
+        url: `https://www.bilibili.com/video/${videoData.bvid}`,
+        author: videoData.owner?.name,
+        description,
+        tags,
+        publish_time: formatPublishDate(pubdate),
+        publish_timestamp: pubdate,
+        statistics: {
+          view: videoData.stat?.view ?? 0,
+          danmaku: videoData.stat?.danmaku ?? 0,
+          reply: videoData.stat?.reply ?? 0,
+          like: videoData.stat?.like ?? 0,
+        },
+        pages,
+        login_required: Boolean(videoData.need_login_subtitle),
+      },
+    };
+    cacheManager.setVideoInfo(cacheKey, fallback);
+    return fallback;
   }
 }

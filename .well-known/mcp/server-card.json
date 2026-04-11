@@ -1,44 +1,118 @@
 {
   "serverInfo": {
-    "name": "bilibili-mcp-server",
-    "version": "1.0.0"
+    "name": "biliscope-mcp-server",
+    "version": "2.0.0"
   },
   "tools": [
     {
-      "name": "get_video_info",
-      "description": "获取 Bilibili 视频信息，优先返回字幕内容，如无字幕则返回视频简介和标签。支持指定偏好语言。",
+      "name": "search_videos",
+      "description": "按关键词搜索 B 站视频。",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "bvid_or_url": {
-            "type": "string",
-            "description": "Bilibili 视频 BV 号或完整 URL"
-          },
-          "preferred_lang": {
-            "type": "string",
-            "description": "可选参数，指定偏好字幕语言代码，如 'zh-Hans', 'zh-Hant', 'en' 等。默认按 zh-Hans -> zh-Hant -> en 顺序选择。"
-          }
+          "keyword": { "type": "string" },
+          "page": { "type": "number" },
+          "page_size": { "type": "number" }
         },
-        "required": ["bvid_or_url"]
+        "required": ["keyword"]
+      }
+    },
+    {
+      "name": "resolve_video",
+      "description": "输入关键词、BV/AV 或链接，解析为标准视频对象。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" }
+        },
+        "required": ["input"]
+      }
+    },
+    {
+      "name": "get_video_detail",
+      "description": "获取视频详情。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" }
+        },
+        "required": ["input"]
+      }
+    },
+    {
+      "name": "get_video_subtitles",
+      "description": "获取视频字幕。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" },
+          "preferred_lang": { "type": "string" }
+        },
+        "required": ["input"]
       }
     },
     {
       "name": "get_video_comments",
-      "description": "获取 Bilibili 视频热门评论。过滤表情占位符，优先保留包含时间戳的评论（如 '05:20'）。支持 brief（10条）和 detailed（50条+回复）两种模式。",
+      "description": "获取视频热门评论。",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "bvid_or_url": {
-            "type": "string",
-            "description": "Bilibili 视频 BV 号或完整 URL"
-          },
-          "detail_level": {
-            "type": "string",
-            "description": "评论详细程度：'brief' 获取前10条热门评论；'detailed' 获取前50条热门评论及其高赞回复",
-            "enum": ["brief", "detailed"]
-          }
+          "input": { "type": "string" },
+          "detail_level": { "type": "string", "enum": ["brief", "detailed"] }
         },
-        "required": ["bvid_or_url"]
+        "required": ["input"]
+      }
+    },
+    {
+      "name": "get_video_danmaku",
+      "description": "获取视频弹幕。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" },
+          "limit": { "type": "number" }
+        },
+        "required": ["input"]
+      }
+    },
+    {
+      "name": "get_up_info",
+      "description": "获取 UP 主信息。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mid_or_url": { "type": "string" }
+        },
+        "required": ["mid_or_url"]
+      }
+    },
+    {
+      "name": "get_hot_videos",
+      "description": "获取热门视频列表。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "get_bangumi_timeline",
+      "description": "获取番剧时间表。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_related_videos",
+      "description": "获取相关推荐视频。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" }
+        },
+        "required": ["input"]
       }
     }
   ],

@@ -1,12 +1,15 @@
 {
-  "name": "@xzxzzx/bilibili-mcp",
-  "version": "1.3.8",
-  "description": "Bilibili MCP tool for video and comment summarization",
+  "name": "biliscope-mcp",
+  "version": "2.0.0",
+  "description": "BiliScope MCP: Bilibili tools with CookieCloud auto-refresh and single JSON deployment",
   "type": "module",
-  "main": "src/index.ts",
-  "module": "./src/index.ts",
+  "main": "dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "bin": {
-    "bilibili-mcp": "dist/cli.js"
+    "biliscope-mcp": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,10 +17,12 @@
     "start": "node dist/index.js",
     "dev": "smithery dev",
     "build:smithery": "smithery build",
+    "check": "node dist/cli.js check",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "test:env": "node -e \"console.log('检查环境变量...'); console.log('BILIBILI_SESSDATA:', process.env.BILIBILI_SESSDATA ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_BILI_JCT:', process.env.BILIBILI_BILI_JCT ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_DEDEUSERID:', process.env.BILIBILI_DEDEUSERID ? '✅ 已配置' : '❌ 未配置');\"",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "release:patch": "npm version patch && npm publish --access public",
+    "release:minor": "npm version minor && npm publish --access public",
+    "release:major": "npm version major && npm publish --access public"
   },
   "config": {
     "bilibili": {
@@ -29,7 +34,6 @@
   "files": [
     "dist",
     "README.md",
-    "README_EN.md",
     "LICENSE"
   ],
   "publishConfig": {
@@ -39,15 +43,12 @@
     "mcp",
     "model-context-protocol",
     "bilibili",
-    "video",
-    "comments",
+    "cookiecloud",
     "subtitle",
-    "chinese",
-    "b站",
-    "视频总结",
-    "评论总结"
+    "danmaku",
+    "comments"
   ],
-  "author": "xzxzzx",
+  "author": "24730",
   "license": "GPL-3.0",
   "repository": {
     "type": "git",

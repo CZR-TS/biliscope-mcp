@@ -1,77 +1,60 @@
-/**
- * 输入验证模块
- * 提供统一的输入验证功能
- */
+import { ValidationError } from "./errors.js";
 
-export interface ValidationOptions {
+interface ValidationOptions {
   maxLength?: number;
   minLength?: number;
   required?: boolean;
 }
 
-/**
- * 验证字符串长度
- */
-export function validateLength(
+function validateLength(
   input: string | undefined,
-  options: ValidationOptions = {}
+  options: ValidationOptions = {},
 ): void {
   const { maxLength = 256, minLength = 1, required = true } = options;
-  
+
   if (required && !input) {
-    throw new Error('Input is required');
+    throw new ValidationError("缺少必填参数。");
   }
-  
-  if (input) {
-    if (input.length < minLength) {
-      throw new Error(`Input must be at least ${minLength} characters long`);
-    }
-    
-    if (input.length > maxLength) {
-      throw new Error(`Input must not exceed ${maxLength} characters`);
-    }
+  if (!input) {
+    return;
   }
-}
-
-/**
- * 验证BV号或URL输入
- */
-export function validateBVInput(input: string): void {
-  validateLength(input, {
-    maxLength: 256,
-    minLength: 1,
-    required: true
-  });
-  
-  // 基本格式验证
-  if (!input.includes('BV') && !input.includes('bilibili.com') && !input.includes('b23.tv')) {
-    throw new Error('Input must contain BV ID or Bilibili URL');
+  if (input.length < minLength) {
+    throw new ValidationError(`输入长度不能少于 ${minLength} 个字符。`);
+  }
+  if (input.length > maxLength) {
+    throw new ValidationError(`输入长度不能超过 ${maxLength} 个字符。`);
   }
 }
 
-/**
- * 验证语言参数
- */
+export function validateVideoInput(input: string): void {
+  validateLength(input, { maxLength: 512, minLength: 1, required: true });
+}
+
+export function validateKeyword(input: string): void {
+  validateLength(input, { maxLength: 100, minLength: 1, required: true });
+}
+
 export function validateLanguage(lang?: string): void {
-  if (lang) {
-    validateLength(lang, {
-      maxLength: 10,
-      minLength: 2,
-      required: false
-    });
-    
-    // 语言代码格式验证
-    if (!/^[a-z]{2}(-[A-Za-z]{2,})?$/.test(lang)) {
-      throw new Error('Invalid language code format');
-    }
+  if (!lang) {
+    return;
+  }
+  validateLength(lang, { maxLength: 12, minLength: 2, required: false });
+  if (!/^[a-z]{2}(-[A-Za-z]{2,})?$/.test(lang)) {
+    throw new ValidationError("字幕语言代码格式不正确。");
   }
 }
 
-/**
- * 验证评论详情级别
- */
 export function validateDetailLevel(level?: string): void {
-  if (level && !['brief', 'detailed'].includes(level)) {
-    throw new Error('Invalid detail level: must be "brief" or "detailed"');
+  if (!level) {
+    return;
+  }
+  if (!["brief", "detailed"].includes(level)) {
+    throw new ValidationError('detail_level 仅支持 "brief" 或 "detailed"。');
+  }
+}
+
+export function validatePositiveInteger(value: number, fieldName: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new ValidationError(`${fieldName} 必须是正整数。`);
   }
 }
