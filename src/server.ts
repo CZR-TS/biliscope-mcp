@@ -23,23 +23,12 @@ import {
 } from "./utils/validation.js";
 import { logger } from "./utils/logger.js";
 
-export const server = new Server(
-  {
-    name: "biliscope-mcp-server",
-    version: "2.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  },
-);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
+function getTools() {
+  return [
     {
       name: "search_videos",
-      description: "按关键词搜索 B 站视频。返回标题、BV 号、链接、作者、播放量、时长、发布时间和简介，适合先搜索再决定进一步调用哪个视频工具。",
+      description:
+        "按关键词搜索 B 站视频。返回标题、BV 号、链接、作者、播放量、时长、发布时间和简介，适合先搜索再决定进一步调用哪个视频工具。",
       inputSchema: {
         type: "object",
         properties: {
@@ -52,7 +41,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "resolve_video",
-      description: "输入关键词、BV 号、AV 号或链接，解析成标准视频对象。适合在不确定视频标识格式时做统一解析。",
+      description:
+        "输入关键词、BV 号、AV 号或链接，解析成标准视频对象。适合在不确定视频标识格式时做统一解析。",
       inputSchema: {
         type: "object",
         properties: {
@@ -63,7 +53,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_video_detail",
-      description: "获取视频详情。返回标题、简介、封面、作者、统计、标签、分P列表和发布时间，适合做内容卡片或后续分析前的元数据读取。",
+      description:
+        "获取视频详情。返回标题、简介、封面、作者、统计、标签、分P列表和发布时间，适合做内容卡片或后续分析前的元数据读取。",
       inputSchema: {
         type: "object",
         properties: {
@@ -74,7 +65,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_video_subtitles",
-      description: "获取视频字幕，默认只返回一种语言。可通过 preferred_lang 指定语言；留空时按内置优先级自动选择：zh-Hans(人工简体中文) > ai-zh(AI 中文字幕) > zh-CN(简体中文兼容标记) > zh-Hant(繁体中文) > en(英文)。返回字幕全文、时间片段、所选语言和视频元数据；若视频无字幕则退回简介。",
+      description:
+        "获取视频字幕，默认只返回一种语言。可通过 preferred_lang 指定语言；留空时按内置优先级自动选择：zh-Hans(人工简体中文) > ai-zh(AI 中文字幕) > zh-CN(简体中文兼容标记) > zh-Hant(繁体中文) > en(英文)。返回字幕全文、时间片段、所选语言和视频元数据；若视频无字幕则退回简介。",
       inputSchema: {
         type: "object",
         properties: {
@@ -86,7 +78,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_video_comments",
-      description: "获取视频热门评论。brief 返回较短结果，适合快速看口碑；detailed 返回更多评论和部分高赞回复，适合做更深入的舆情或观点整理。",
+      description:
+        "获取视频热门评论。brief 返回较短结果，适合快速看口碑；detailed 返回更多评论和部分高赞回复，适合做更深入的舆情或观点整理。",
       inputSchema: {
         type: "object",
         properties: {
@@ -102,7 +95,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_video_danmaku",
-      description: "获取视频弹幕。默认返回前 100 条，可自定义 limit；返回结果包含弹幕时间、可读时间文本和内容，并标记是否发生截断。",
+      description:
+        "获取视频弹幕。默认返回前 100 条，可自定义 limit；返回结果包含弹幕时间、可读时间文本和内容，并标记是否发生截断。",
       inputSchema: {
         type: "object",
         properties: {
@@ -114,7 +108,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_up_info",
-      description: "获取 UP 主信息和最近投稿列表。输入 mid 或空间链接，返回昵称、头像、签名、等级、粉丝数和最近视频。",
+      description:
+        "获取 UP 主信息和最近投稿列表。输入 mid 或空间链接，返回昵称、头像、签名、等级、粉丝数和最近视频。",
       inputSchema: {
         type: "object",
         properties: {
@@ -152,8 +147,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["input"],
       },
     },
-  ],
-}));
+  ];
+}
 
 async function callTool(name: string, args: Record<string, unknown>) {
   switch (name) {
@@ -222,26 +217,48 @@ async function callTool(name: string, args: Record<string, unknown>) {
   }
 }
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args = {} } = request.params;
-  const startedAt = Date.now();
+export function createServer(): Server {
+  const server = new Server(
+    {
+      name: "biliscope-mcp-server",
+      version: "2.1.0",
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    },
+  );
 
-  try {
-    const result = await callTool(name, args as Record<string, unknown>);
-    logger.logToolResult(name, true, Date.now() - startedAt);
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    };
-  } catch (error) {
-    logger.logToolResult(
-      name,
-      false,
-      Date.now() - startedAt,
-      error instanceof Error ? error.message : String(error),
-    );
-    return {
-      content: [{ type: "text", text: JSON.stringify(formatToolError(error), null, 2) }],
-      isError: true,
-    };
-  }
-});
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: getTools(),
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args = {} } = request.params;
+    const startedAt = Date.now();
+
+    try {
+      const result = await callTool(name, args as Record<string, unknown>);
+      logger.logToolResult(name, true, Date.now() - startedAt);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      logger.logToolResult(
+        name,
+        false,
+        Date.now() - startedAt,
+        error instanceof Error ? error.message : String(error),
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(formatToolError(error), null, 2) }],
+        isError: true,
+      };
+    }
+  });
+
+  return server;
+}
+
+export const server = createServer();

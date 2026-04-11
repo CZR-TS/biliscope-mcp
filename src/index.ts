@@ -4,7 +4,8 @@ import { dirname, resolve } from "path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
 import { credentialManager } from "./utils/credentials.js";
-import { validateRuntimeConfig } from "./config.js";
+import { config, validateRuntimeConfig } from "./config.js";
+import { startHttpServer } from "./http-server.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +21,17 @@ export default server;
 async function main() {
   validateRuntimeConfig();
   await credentialManager.initialize();
+  if (config.transportMode === "http") {
+    await startHttpServer({
+      host: config.httpHost,
+      port: config.httpPort,
+      mcpPath: config.httpMcpPath,
+      ssePath: config.httpSsePath,
+      messagesPath: config.httpMessagesPath,
+    });
+    return;
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("BiliScope MCP started with CookieCloud authentication");

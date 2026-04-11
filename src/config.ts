@@ -14,6 +14,12 @@ export interface Config {
   cookieCloudPassword: string;
   cookieCloudDomains: string[];
   cookieRefreshIntervalMinutes: number;
+  transportMode: "stdio" | "http";
+  httpHost: string;
+  httpPort: number;
+  httpMcpPath: string;
+  httpSsePath: string;
+  httpMessagesPath: string;
 }
 
 export const DEFAULT_CONFIG: Omit<
@@ -32,6 +38,12 @@ export const DEFAULT_CONFIG: Omit<
   cookieSource: "cookiecloud",
   cookieCloudDomains: ["bilibili.com", ".bilibili.com", "www.bilibili.com"],
   cookieRefreshIntervalMinutes: 10,
+  transportMode: "stdio",
+  httpHost: "127.0.0.1",
+  httpPort: 3000,
+  httpMcpPath: "/mcp",
+  httpSsePath: "/sse",
+  httpMessagesPath: "/messages",
 };
 
 function parseIntEnv(value: string | undefined, fallback: number): number {
@@ -77,6 +89,14 @@ export const config: Config = {
     process.env.COOKIE_REFRESH_INTERVAL_MINUTES,
     DEFAULT_CONFIG.cookieRefreshIntervalMinutes,
   ),
+  transportMode:
+    process.env.BILISCOPE_TRANSPORT === "http" ? "http" : DEFAULT_CONFIG.transportMode,
+  httpHost: process.env.BILISCOPE_HTTP_HOST || DEFAULT_CONFIG.httpHost,
+  httpPort: parseIntEnv(process.env.BILISCOPE_HTTP_PORT, DEFAULT_CONFIG.httpPort),
+  httpMcpPath: process.env.BILISCOPE_HTTP_MCP_PATH || DEFAULT_CONFIG.httpMcpPath,
+  httpSsePath: process.env.BILISCOPE_HTTP_SSE_PATH || DEFAULT_CONFIG.httpSsePath,
+  httpMessagesPath:
+    process.env.BILISCOPE_HTTP_MESSAGES_PATH || DEFAULT_CONFIG.httpMessagesPath,
 };
 
 export function validateRuntimeConfig(): void {

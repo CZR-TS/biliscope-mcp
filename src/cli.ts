@@ -5,7 +5,8 @@ import { program } from "commander";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
 import { credentialManager } from "./utils/credentials.js";
-import { validateRuntimeConfig } from "./config.js";
+import { config, validateRuntimeConfig } from "./config.js";
+import { startHttpServer } from "./http-server.js";
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
@@ -17,6 +18,18 @@ async function startServer() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("BiliScope MCP started with CookieCloud authentication");
+}
+
+async function startHttpMode() {
+  validateRuntimeConfig();
+  await credentialManager.initialize();
+  await startHttpServer({
+    host: config.httpHost,
+    port: config.httpPort,
+    mcpPath: config.httpMcpPath,
+    ssePath: config.httpSsePath,
+    messagesPath: config.httpMessagesPath,
+  });
 }
 
 function checkConfig() {
@@ -44,11 +57,13 @@ function showHelp() {
   console.log("用法：");
   console.log("  biliscope-mcp         启动 MCP 服务");
   console.log("  biliscope-mcp check   检查 CookieCloud 配置");
+  console.log("  biliscope-mcp http    启动 Streamable HTTP/SSE 服务");
   console.log("  biliscope-mcp help    显示帮助");
   console.log("");
   console.log("说明：");
   console.log("  仅支持 CookieCloud，不再支持本地手动 Cookie。");
   console.log("  部署时请通过 env 提供 COOKIECLOUD_ENDPOINT / UUID / PASSWORD。");
+  console.log("  远程部署可使用 BILISCOPE_TRANSPORT=http，或直接运行 biliscope-mcp http。");
 }
 
 async function main() {
@@ -60,6 +75,9 @@ async function main() {
       switch (command) {
         case "check":
           checkConfig();
+          break;
+        case "http":
+          await startHttpMode();
           break;
         case "help":
         case "--help":
@@ -82,6 +100,7 @@ async function main() {
     });
 
   program.command("check").description("检查 CookieCloud 配置").action(checkConfig);
+  program.command("http").description("启动 Streamable HTTP/SSE 服务").action(startHttpMode);
   program.command("help").description("显示帮助").action(showHelp);
 
   await program.parseAsync(process.argv);
