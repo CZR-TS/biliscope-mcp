@@ -47,17 +47,13 @@ export const DEFAULT_CONFIG: Omit<
 };
 
 function parseIntEnv(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
+  if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function parseDomainKeywords(value: string | undefined): string[] {
-  if (!value) {
-    return [...DEFAULT_CONFIG.cookieCloudDomains];
-  }
+  if (!value) return [...DEFAULT_CONFIG.cookieCloudDomains];
   const domains = value
     .split(",")
     .map((item) => item.trim())

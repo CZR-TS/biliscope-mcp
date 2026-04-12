@@ -2,7 +2,7 @@
   "name": "biliscope-mcp",
   "displayName": "BiliScope MCP",
   "description": "BiliScope MCP，使用 CookieCloud 自动同步登录态，支持单 JSON 部署。",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "24730",
   "license": "GPL-3.0",
   "repository": {

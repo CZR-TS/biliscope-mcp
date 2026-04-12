@@ -1,6 +1,6 @@
 {
   "name": "biliscope-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "BiliScope MCP: Bilibili tools with CookieCloud auto-refresh and single JSON deployment",
   "type": "module",
   "main": "dist/index.js",

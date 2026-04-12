@@ -12,17 +12,19 @@ const packageJson = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
 
-async function startServer() {
+async function startStdioServer() {
   validateRuntimeConfig();
   await credentialManager.initialize();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("BiliScope MCP started with CookieCloud authentication");
+  console.error("BiliScope MCP started with stdio transport");
 }
 
-async function startHttpMode() {
+async function startHttpMode(shouldInitialize: boolean = true) {
   validateRuntimeConfig();
-  await credentialManager.initialize();
+  if (shouldInitialize) {
+    await credentialManager.initialize();
+  }
   await startHttpServer({
     host: config.httpHost,
     port: config.httpPort,
@@ -30,6 +32,14 @@ async function startHttpMode() {
     ssePath: config.httpSsePath,
     messagesPath: config.httpMessagesPath,
   });
+}
+
+async function startDefaultServer() {
+  if (config.transportMode === "http") {
+    await startHttpMode();
+    return;
+  }
+  await startStdioServer();
 }
 
 function checkConfig() {
@@ -55,52 +65,51 @@ function showHelp() {
   console.log("BiliScope MCP - CookieCloud 自动登录版");
   console.log("");
   console.log("用法：");
-  console.log("  biliscope-mcp         启动 MCP 服务");
-  console.log("  biliscope-mcp check   检查 CookieCloud 配置");
+  console.log("  biliscope-mcp         启动 MCP 服务；默认 stdio，BILISCOPE_TRANSPORT=http 时启动 HTTP");
   console.log("  biliscope-mcp http    启动 Streamable HTTP/SSE 服务");
+  console.log("  biliscope-mcp check   检查 CookieCloud 配置");
   console.log("  biliscope-mcp help    显示帮助");
   console.log("");
   console.log("说明：");
   console.log("  仅支持 CookieCloud，不再支持本地手动 Cookie。");
-  console.log("  部署时请通过 env 提供 COOKIECLOUD_ENDPOINT / UUID / PASSWORD。");
-  console.log("  远程部署可使用 BILISCOPE_TRANSPORT=http，或直接运行 biliscope-mcp http。");
+  console.log("  远程部署推荐使用 Streamable HTTP：BILISCOPE_TRANSPORT=http。");
+  console.log("  Streamable HTTP 默认端点：/mcp。");
+  console.log("  兼容 SSE 默认端点：/sse，消息端点：/messages。");
 }
 
 async function main() {
   program.name("biliscope-mcp").version(packageJson.version).description("BiliScope MCP");
 
-  program
-    .arguments("[command]")
-    .action(async (command) => {
-      switch (command) {
-        case "check":
-          checkConfig();
-          break;
-        case "http":
-          await startHttpMode();
-          break;
-        case "help":
-        case "--help":
-        case "-h":
-          showHelp();
-          break;
-        case "version":
-        case "--version":
-        case "-v":
-          console.log(packageJson.version);
-          break;
-        case undefined:
-          await startServer();
-          break;
-        default:
-          console.error(`未知命令：${command}`);
-          showHelp();
-          process.exit(1);
-      }
-    });
+  program.arguments("[command]").action(async (command) => {
+    switch (command) {
+      case "http":
+        await startHttpMode();
+        break;
+      case "check":
+        checkConfig();
+        break;
+      case "help":
+      case "--help":
+      case "-h":
+        showHelp();
+        break;
+      case "version":
+      case "--version":
+      case "-v":
+        console.log(packageJson.version);
+        break;
+      case undefined:
+        await startDefaultServer();
+        break;
+      default:
+        console.error(`未知命令：${command}`);
+        showHelp();
+        process.exit(1);
+    }
+  });
 
-  program.command("check").description("检查 CookieCloud 配置").action(checkConfig);
   program.command("http").description("启动 Streamable HTTP/SSE 服务").action(startHttpMode);
+  program.command("check").description("检查 CookieCloud 配置").action(checkConfig);
   program.command("help").description("显示帮助").action(showHelp);
 
   await program.parseAsync(process.argv);
