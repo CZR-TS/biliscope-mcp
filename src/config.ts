@@ -38,8 +38,8 @@ export const DEFAULT_CONFIG: Omit<
   cookieSource: "cookiecloud",
   cookieCloudDomains: ["bilibili.com", ".bilibili.com", "www.bilibili.com"],
   cookieRefreshIntervalMinutes: 10,
-  transportMode: "stdio",
-  httpHost: "127.0.0.1",
+  transportMode: "http",
+  httpHost: "0.0.0.0",
   httpPort: 3000,
   httpMcpPath: "/mcp",
   httpSsePath: "/sse",
@@ -59,6 +59,11 @@ function parseDomainKeywords(value: string | undefined): string[] {
     .map((item) => item.trim())
     .filter(Boolean);
   return domains.length > 0 ? domains : [...DEFAULT_CONFIG.cookieCloudDomains];
+}
+
+function parseTransportMode(value: string | undefined): "stdio" | "http" {
+  if (value === "stdio") return "stdio";
+  return "http";
 }
 
 export const config: Config = {
@@ -85,10 +90,9 @@ export const config: Config = {
     process.env.COOKIE_REFRESH_INTERVAL_MINUTES,
     DEFAULT_CONFIG.cookieRefreshIntervalMinutes,
   ),
-  transportMode:
-    process.env.BILISCOPE_TRANSPORT === "http" ? "http" : DEFAULT_CONFIG.transportMode,
-  httpHost: process.env.BILISCOPE_HTTP_HOST || DEFAULT_CONFIG.httpHost,
-  httpPort: parseIntEnv(process.env.BILISCOPE_HTTP_PORT, DEFAULT_CONFIG.httpPort),
+  transportMode: parseTransportMode(process.env.BILISCOPE_TRANSPORT),
+  httpHost: process.env.BILISCOPE_HTTP_HOST || process.env.HOST || DEFAULT_CONFIG.httpHost,
+  httpPort: parseIntEnv(process.env.BILISCOPE_HTTP_PORT || process.env.PORT, DEFAULT_CONFIG.httpPort),
   httpMcpPath: process.env.BILISCOPE_HTTP_MCP_PATH || DEFAULT_CONFIG.httpMcpPath,
   httpSsePath: process.env.BILISCOPE_HTTP_SSE_PATH || DEFAULT_CONFIG.httpSsePath,
   httpMessagesPath:

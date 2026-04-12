@@ -1,18 +1,10 @@
 # BiliScope MCP
 
-BiliScope MCP 是一个面向 MCP 客户端的 B 站读取型服务，支持：
+BiliScope MCP 是一个面向 B 站内容读取的 MCP 服务。默认使用 **Streamable HTTP** 远程部署方式，并通过 CookieCloud 自动同步 B 站登录 Cookie。
 
-- CookieCloud 自动拉取和刷新 B 站 Cookie
-- 同时支持 `stdio` 与远程 `Streamable HTTP / SSE`
-- 搜索、视频详情、字幕、评论、弹幕、UP 主信息、热门视频、番剧时间表
+## 最终部署 JSON
 
-## 部署
-
-只支持 CookieCloud，不再支持手动 Cookie。
-
-### 1. Stdio 模式
-
-适合本地客户端，或支持直接执行命令的 MCP 托管平台。
+大多数托管平台只需要你填 CookieCloud 的三个值：
 
 ```json
 {
@@ -21,129 +13,114 @@ BiliScope MCP 是一个面向 MCP 客户端的 B 站读取型服务，支持：
       "command": "npx",
       "args": ["-y", "biliscope-mcp"],
       "env": {
-        "BILIBILI_COOKIE_SOURCE": "cookiecloud",
         "COOKIECLOUD_ENDPOINT": "https://cookies.xm.mk",
         "COOKIECLOUD_UUID": "你的UUID",
-        "COOKIECLOUD_PASSWORD": "你的密码",
-        "COOKIE_REFRESH_INTERVAL_MINUTES": "10"
+        "COOKIECLOUD_PASSWORD": "你的密码"
       }
     }
   }
 }
 ```
 
-### 2. 远程 HTTP / SSE 模式
+这三个字段分别对应 CookieCloud 插件里的：
 
-适合你要把服务部署到服务器，再通过 URL 给其他客户端或平台调用。
+- `COOKIECLOUD_ENDPOINT`：CookieCloud 服务器地址
+- `COOKIECLOUD_UUID`：用户KEY / UUID
+- `COOKIECLOUD_PASSWORD`：端对端加密密码
 
-启动方式：
+其他 HTTP 监听参数已经内置默认值，普通用户不需要手动配置：
 
-```bash
-BILISCOPE_TRANSPORT=http
-BILISCOPE_HTTP_HOST=0.0.0.0
-BILISCOPE_HTTP_PORT=3000
-npx -y biliscope-mcp
+- 默认传输模式：Streamable HTTP
+- 默认监听地址：`0.0.0.0`
+- 默认端口：`3000`
+- 默认 MCP 端点：`/mcp`
+- 兼容 SSE 端点：`/sse`
+- SSE 消息端点：`/messages`
+
+如果部署平台要求填写服务 URL，通常填：
+
+```text
+https://你的部署域名/mcp
 ```
 
-或者：
+## CookieCloud 该怎么设置
 
-```bash
-npx -y biliscope-mcp http
-```
+浏览器插件侧建议这样设置：
 
-默认端点：
-
-- Streamable HTTP：`/mcp`
-- SSE：`/sse`
-- SSE messages：`/messages`
-
-可选环境变量：
-
-- `BILISCOPE_TRANSPORT=http`
-- `BILISCOPE_HTTP_HOST=0.0.0.0`
-- `BILISCOPE_HTTP_PORT=3000`
-- `BILISCOPE_HTTP_MCP_PATH=/mcp`
-- `BILISCOPE_HTTP_SSE_PATH=/sse`
-- `BILISCOPE_HTTP_MESSAGES_PATH=/messages`
-
-## CookieCloud 配置
-
-浏览器插件建议这样配置：
-
-- 服务器地址：你的 CookieCloud 服务地址，例如 `https://cookies.xm.mk`
 - 工作模式：上传到服务器
+- 服务器地址：例如 `https://cookies.xm.mk`
 - 同步域名关键词：`bilibili.com`
 - 同步时间间隔：建议 10 分钟
 
-MCP 启动后会先向 CookieCloud 拉取并解密 Cookie，成功后才会启动。运行过程中遇到 `-101`、`401`、`412` 或明显的未登录错误时，会自动强制刷新一次 Cookie；若刷新后仍失败，工具会直接返回标准化鉴权错误。
+同步域名关键词在 CookieCloud 插件里配置即可，部署 JSON 里不需要再写。
+
+## 工具功能
+
+- `search_videos`：搜索 B 站视频
+- `resolve_video`：把关键词、BV、AV 或链接解析成标准视频对象
+- `get_video_detail`：获取视频标题、简介、作者、统计、分 P 等详情
+- `get_video_subtitles`：获取视频字幕，默认只返回一种语言
+- `get_video_comments`：获取热门评论
+- `get_video_danmaku`：获取弹幕
+- `get_up_info`：获取 UP 主信息和最近投稿
+- `get_hot_videos`：获取热门视频
+- `get_bangumi_timeline`：获取番剧时间表
+- `get_related_videos`：获取相关推荐
 
 ## 字幕语言选择
 
-`get_video_subtitles` 默认只返回一种语言字幕，不会一次性返回全部语言轨道。
+`get_video_subtitles` 不会一次性返回全部语言轨道，只会返回一种语言。
 
-- 传入 `preferred_lang`：优先返回你指定的语言
-- 不传或留空：按内置优先级自动选择第一条可用字幕
+你可以传 `preferred_lang` 指定语言。不传时按下面优先级自动选择：
 
-当前优先级如下：
+1. `zh-Hans`：人工简体中文字幕
+2. `ai-zh`：AI 自动生成中文字幕
+3. `zh-CN`：简体中文兼容标记
+4. `zh-Hant`：繁体中文字幕
+5. `en`：英文字幕
 
-1. `zh-Hans`
-   人工简体中文字幕，最适合大多数中文阅读场景
-2. `ai-zh`
-   AI 自动生成的中文字幕，很多视频只有这一轨
-3. `zh-CN`
-   简体中文的兼容语言标记
-4. `zh-Hant`
-   繁体中文字幕
-5. `en`
-   英文字幕
+## 高级配置
 
-常见示例：
+一般不需要配置这些。如果平台有特殊要求，可以用环境变量覆盖：
 
-- `preferred_lang=zh-Hans`
-- `preferred_lang=zh-Hant`
-- `preferred_lang=en`
-- 留空则自动按优先级选择
+```json
+{
+  "BILISCOPE_TRANSPORT": "http",
+  "BILISCOPE_HTTP_HOST": "0.0.0.0",
+  "BILISCOPE_HTTP_PORT": "3000",
+  "BILISCOPE_HTTP_MCP_PATH": "/mcp",
+  "BILISCOPE_HTTP_SSE_PATH": "/sse",
+  "BILISCOPE_HTTP_MESSAGES_PATH": "/messages",
+  "COOKIE_REFRESH_INTERVAL_MINUTES": "10"
+}
+```
 
-## 工具
+需要本地 stdio 模式时才设置：
 
-- `search_videos`
-- `resolve_video`
-- `get_video_detail`
-- `get_video_subtitles`
-- `get_video_comments`
-- `get_video_danmaku`
-- `get_up_info`
-- `get_hot_videos`
-- `get_bangumi_timeline`
-- `get_related_videos`
+```json
+{
+  "BILISCOPE_TRANSPORT": "stdio"
+}
+```
 
 ## 本地开发
 
 ```bash
 npm install
 npm run build
-npm run check
+npm run start:http
 ```
 
-本地调试也只通过环境变量提供 CookieCloud 参数：
+## 常见错误
 
-```bash
-COOKIECLOUD_ENDPOINT=https://cookies.xm.mk
-COOKIECLOUD_UUID=你的UUID
-COOKIECLOUD_PASSWORD=你的密码
-COOKIE_REFRESH_INTERVAL_MINUTES=10
-```
+### `COOKIECLOUD_DECRYPT_FAILED`
 
-## 常见问题
+通常是 UUID 或端对端加密密码不正确。
 
-### 1. 启动时报 `COOKIECLOUD_DECRYPT_FAILED`
+### `BILIBILI_COOKIE_INVALID`
 
-通常是 `COOKIECLOUD_UUID` 或 `COOKIECLOUD_PASSWORD` 不正确。
+CookieCloud 返回的数据里没有完整的 B 站登录 Cookie，或浏览器里的 B 站登录态已经失效。
 
-### 2. 启动时报 `BILIBILI_COOKIE_INVALID`
+### 部署后访问不到
 
-CookieCloud 虽然返回了数据，但其中没有完整的 `SESSDATA`、`bili_jct`、`DedeUserID`，或者浏览器里的 B 站登录态已经失效。
-
-### 3. 为什么不保留手动 Cookie 兜底
-
-这个版本按部署平台约束设计，目标是纯 CookieCloud 自动同步。一旦 Cookie 失效就直接报错，避免部署端出现“旧 Cookie 悄悄继续工作但状态不一致”的问题。
+确认平台实际访问的是 `/mcp`，并且平台允许 HTTP 服务监听 `3000` 端口。如果平台指定了 `PORT` 环境变量，BiliScope 会自动读取它。
