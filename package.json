@@ -12,15 +12,13 @@
     "biliscope-mcp": "dist/cli.js"
   },
   "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "start:http": "node dist/cli.js http",
-    "dev": "smithery dev",
-    "build:smithery": "smithery build",
     "check": "node dist/cli.js check",
-    "prepublishOnly": "npm run build",
-    "release": "semantic-release",
+    "prepublishOnly": "npm run clean && npm run build",
     "release:patch": "npm version patch && npm publish --access public",
     "release:minor": "npm version minor && npm publish --access public",
     "release:major": "npm version major && npm publish --access public"
@@ -70,15 +68,8 @@
     "quick-lru": "^7.3.0"
   },
   "devDependencies": {
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^11.0.1",
-    "@semantic-release/npm": "^12.0.1",
-    "@smithery/cli": "^4.5.0",
     "@types/express": "^5.0.3",
     "@types/node": "^22.19.8",
-    "esbuild": "^0.24.2",
-    "semantic-release": "^25.0.3",
     "typescript": "^5.7.2"
   }
 }
