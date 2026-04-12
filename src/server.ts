@@ -11,6 +11,7 @@ import {
   searchVideoItems,
 } from "./bilibili/comments.js";
 import { getVideoInfoWithSubtitle } from "./bilibili/subtitle.js";
+import { credentialManager } from "./utils/credentials.js";
 import {
   BilibiliAPIError,
   NetworkError,
@@ -38,6 +39,20 @@ function shouldKeepClientReasoning(error: unknown): boolean {
 
 function getTools() {
   return [
+    {
+      name: "configure_cookiecloud",
+      description:
+        "在当前 MCP 服务实例内配置 CookieCloud。仅当部署平台没有正确注入环境变量时使用；配置只保存在内存，不落盘。配置成功后，字幕和评论工具会使用这组 CookieCloud 参数。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          endpoint: { type: "string", description: "CookieCloud 服务器地址，例如 https://cookies.xm.mk" },
+          uuid: { type: "string", description: "CookieCloud 用户 KEY / UUID" },
+          password: { type: "string", description: "CookieCloud 端对端加密密码" },
+        },
+        required: ["endpoint", "uuid", "password"],
+      },
+    },
     {
       name: "search_videos",
       description:
@@ -145,6 +160,23 @@ function getTools() {
 
 async function callTool(name: string, args: Record<string, unknown>) {
   switch (name) {
+    case "configure_cookiecloud": {
+      const endpoint = String(args.endpoint ?? "").trim();
+      const uuid = String(args.uuid ?? "").trim();
+      const password = String(args.password ?? "");
+      if (!endpoint || !uuid || !password) {
+        throw new Error("endpoint、uuid、password 都不能为空。");
+      }
+      credentialManager.configureCookieCloud({ endpoint, uuid, password });
+      await credentialManager.initialize();
+      return {
+        ok: true,
+        cookie_source: "cookiecloud",
+        endpoint,
+        uuid_tail: uuid.slice(-6),
+        message: "CookieCloud 配置成功，已完成拉取和解密验证。",
+      };
+    }
     case "search_videos": {
       const keyword = String(args.keyword ?? "");
       const page = Number(args.page ?? 1);
@@ -207,7 +239,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: "biliscope-mcp-server",
-      version: "2.1.6",
+      version: "2.1.7",
     },
     {
       capabilities: {

@@ -18,6 +18,12 @@ export interface BilibiliCredentials {
   refreshedAt: number;
 }
 
+export interface CookieCloudRuntimeConfig {
+  endpoint: string;
+  uuid: string;
+  password: string;
+}
+
 function md5Hex(input: string): string {
   return createHash("md5").update(input).digest("hex");
 }
@@ -174,6 +180,14 @@ export class CredentialManager {
   async initialize(): Promise<void> {
     ensureCookieCloudConfig();
     await this.refreshCredentials(true);
+  }
+
+  configureCookieCloud(runtimeConfig: CookieCloudRuntimeConfig): void {
+    config.cookieCloudEndpoint = runtimeConfig.endpoint.trim();
+    config.cookieCloudUuid = runtimeConfig.uuid.trim();
+    config.cookieCloudPassword = runtimeConfig.password;
+    this.credentials = null;
+    this.refreshPromise = null;
   }
 
   getStatus() {
