@@ -5,15 +5,19 @@ import {
   getHotVideoItems,
   getRelatedVideoItems,
   getResolvedVideoData,
-  getUpInfoData,
   getVideoCommentsData,
   getVideoDanmaku,
   getVideoDetail,
   searchVideoItems,
 } from "./bilibili/comments.js";
-import { getBangumiTimeline } from "./bilibili/client.js";
 import { getVideoInfoWithSubtitle } from "./bilibili/subtitle.js";
-import { formatToolError } from "./utils/errors.js";
+import {
+  BilibiliAPIError,
+  NetworkError,
+  TimeoutError,
+  ValidationError,
+  formatToolError,
+} from "./utils/errors.js";
 import {
   validateDetailLevel,
   validateKeyword,
@@ -22,6 +26,15 @@ import {
   validateVideoInput,
 } from "./utils/validation.js";
 import { logger } from "./utils/logger.js";
+
+function shouldKeepClientReasoning(error: unknown): boolean {
+  return (
+    error instanceof BilibiliAPIError ||
+    error instanceof NetworkError ||
+    error instanceof TimeoutError ||
+    error instanceof ValidationError
+  );
+}
 
 function getTools() {
   return [
@@ -107,18 +120,6 @@ function getTools() {
       },
     },
     {
-      name: "get_up_info",
-      description:
-        "获取 UP 主信息和最近投稿列表。输入 mid 或空间链接，返回昵称、头像、签名、等级、粉丝数和最近视频。",
-      inputSchema: {
-        type: "object",
-        properties: {
-          mid_or_url: { type: "string", description: "UP 主 mid 或空间链接" },
-        },
-        required: ["mid_or_url"],
-      },
-    },
-    {
       name: "get_hot_videos",
       description: "获取当前热门视频列表。适合做趋势观察、推荐候选或热点发现。",
       inputSchema: {
@@ -126,14 +127,6 @@ function getTools() {
         properties: {
           limit: { type: "number", description: "返回数量，默认 10，最大 20" },
         },
-      },
-    },
-    {
-      name: "get_bangumi_timeline",
-      description: "获取番剧时间表。适合查询近期番剧更新安排。",
-      inputSchema: {
-        type: "object",
-        properties: {},
       },
     },
     {
@@ -195,18 +188,11 @@ async function callTool(name: string, args: Record<string, unknown>) {
       validatePositiveInteger(limit, "limit");
       return getVideoDanmaku(input, Math.min(limit, 200));
     }
-    case "get_up_info": {
-      const midOrUrl = String(args.mid_or_url ?? "");
-      validateVideoInput(midOrUrl);
-      return getUpInfoData(midOrUrl);
-    }
     case "get_hot_videos": {
       const limit = Number(args.limit ?? 10);
       validatePositiveInteger(limit, "limit");
       return getHotVideoItems(Math.min(limit, 20));
     }
-    case "get_bangumi_timeline":
-      return getBangumiTimeline();
     case "get_related_videos": {
       const input = String(args.input ?? "");
       validateVideoInput(input);
@@ -221,7 +207,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: "biliscope-mcp-server",
-      version: "2.1.5",
+      version: "2.1.6",
     },
     {
       capabilities: {
@@ -251,9 +237,10 @@ export function createServer(): Server {
         Date.now() - startedAt,
         error instanceof Error ? error.message : String(error),
       );
+      const formatted = formatToolError(error);
       return {
-        content: [{ type: "text", text: JSON.stringify(formatToolError(error), null, 2) }],
-        isError: true,
+        content: [{ type: "text", text: JSON.stringify(formatted, null, 2) }],
+        isError: !shouldKeepClientReasoning(error),
       };
     }
   });

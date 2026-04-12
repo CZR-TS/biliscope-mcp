@@ -1,7 +1,7 @@
 {
   "serverInfo": {
     "name": "biliscope-mcp-server",
-    "version": "2.1.5"
+    "version": "2.1.6"
   },
   "tools": [
     {
@@ -76,17 +76,6 @@
       }
     },
     {
-      "name": "get_up_info",
-      "description": "获取 UP 主信息。",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "mid_or_url": { "type": "string" }
-        },
-        "required": ["mid_or_url"]
-      }
-    },
-    {
       "name": "get_hot_videos",
       "description": "获取热门视频列表。",
       "inputSchema": {
@@ -94,14 +83,6 @@
         "properties": {
           "limit": { "type": "number" }
         }
-      }
-    },
-    {
-      "name": "get_bangumi_timeline",
-      "description": "获取番剧时间表。",
-      "inputSchema": {
-        "type": "object",
-        "properties": {}
       }
     },
     {

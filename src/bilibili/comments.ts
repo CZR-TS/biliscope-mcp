@@ -5,8 +5,6 @@ import {
   getDanmakuXml,
   getHotVideos,
   getRelatedVideos,
-  getUpInfo,
-  getUpVideos,
   getVideoComments,
   searchVideos,
 } from "./client.js";
@@ -220,36 +218,6 @@ export async function getHotVideoItems(limit = 10) {
       duration: formatDuration(item.duration),
       publish_time: item.pubdate ? new Date(item.pubdate * 1000).toISOString() : undefined,
       description: item.desc || "",
-    })),
-  };
-}
-
-export async function getUpInfoData(midInput: string) {
-  const midMatch = midInput.match(/(\d{2,})/);
-  if (!midMatch) {
-    throw new Error("无法从输入中解析 UP 主 mid。请传入 mid 或空间链接。");
-  }
-
-  const mid = Number(midMatch[1]);
-  const [info, videos] = await Promise.all([getUpInfo(mid), getUpVideos(mid, 1, 6)]);
-  const list = Array.isArray(videos?.list?.vlist) ? videos.list.vlist : [];
-
-  return {
-    mid,
-    name: info?.name,
-    face: info?.face,
-    sign: info?.sign,
-    level: info?.level,
-    fans: info?.follower,
-    following: info?.following,
-    archive_count: videos?.page?.count ?? list.length,
-    recent_videos: list.slice(0, 6).map((item: any) => ({
-      title: item.title,
-      bvid: item.bvid,
-      url: `https://www.bilibili.com/video/${item.bvid}`,
-      description: item.description || "",
-      play_count: item.play ?? 0,
-      publish_time: item.created ? new Date(item.created * 1000).toISOString() : undefined,
     })),
   };
 }

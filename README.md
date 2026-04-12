@@ -81,9 +81,7 @@ npx -y biliscope-mcp@latest http
 - `get_video_subtitles`：获取视频字幕，默认只返回一种语言，避免返回过长。
 - `get_video_comments`：获取热门评论或前几页评论预览。
 - `get_video_danmaku`：获取弹幕，默认限制条数。
-- `get_up_info`：获取 UP 主信息和最近投稿。
 - `get_hot_videos`：获取热门视频。
-- `get_bangumi_timeline`：获取番剧时间表。
 - `get_related_videos`：获取相关推荐。
 
 ## 字幕语言选择

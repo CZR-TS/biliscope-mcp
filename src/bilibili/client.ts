@@ -98,7 +98,10 @@ async function retryableFetch<T>(task: () => Promise<T>): Promise<T> {
 function generateWbiRid(params: Record<string, string | number>, mixKey: string): string {
   const sortedQuery = Object.entries(params)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([key, value]) => {
+      const sanitized = String(value).replace(/[!'()*]/g, "");
+      return `${encodeURIComponent(key)}=${encodeURIComponent(sanitized)}`;
+    })
     .join("&");
   return md5Hash(sortedQuery + mixKey);
 }
@@ -394,26 +397,6 @@ export async function getHotVideos(limit = 10): Promise<any[]> {
     { includeAuth: false },
   );
   return Array.isArray(data?.list) ? data.list.slice(0, limit) : [];
-}
-
-export async function getBangumiTimeline(): Promise<any> {
-  return rawRequest(
-    "https://api.bilibili.com/pgc/web/timeline/v2",
-    { day_before: 2, day_after: 4 },
-    { includeAuth: false },
-  );
-}
-
-export async function getUpInfo(mid: number): Promise<any> {
-  return rawRequest("/x/space/wbi/acc/info", { mid }, { includeAuth: false, useWbi: true });
-}
-
-export async function getUpVideos(mid: number, page = 1, pageSize = 10): Promise<any> {
-  return rawRequest(
-    "/x/space/wbi/arc/search",
-    { mid, pn: page, ps: Math.min(pageSize, 20), order: "pubdate" },
-    { includeAuth: false, useWbi: true },
-  );
 }
 
 export async function getRelatedVideos(bvid: string): Promise<any[]> {
