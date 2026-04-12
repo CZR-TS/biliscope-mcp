@@ -221,7 +221,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: "biliscope-mcp-server",
-      version: "2.1.3",
+      version: "2.1.4",
     },
     {
       capabilities: {

@@ -103,11 +103,22 @@ function generateWbiRid(params: Record<string, string | number>, mixKey: string)
   return md5Hash(sortedQuery + mixKey);
 }
 
-function mapBilibiliError(payload: any, url: string): BilibiliAPIError {
+function mapBilibiliError(payload: any, url: string, includeAuth: boolean): BilibiliAPIError {
   const code = payload?.code;
   const message = payload?.message || payload?.msg || "未知错误";
 
   if (code === -101 || /未登录|登录|cookie/i.test(message)) {
+    if (!includeAuth) {
+      return new BilibiliAPIError(
+        "B 站公开接口要求登录或临时拒绝了未登录请求。",
+        "BILIBILI_PUBLIC_AUTH_REQUIRED",
+        undefined,
+        payload,
+        true,
+        "该工具本身不读取 CookieCloud；请稍后重试，或改用需要登录态的相关工具。",
+      );
+    }
+
     return new BilibiliAPIError(
       "B 站登录态已失效。",
       "BILIBILI_COOKIE_INVALID",
@@ -164,11 +175,37 @@ async function getWBI(): Promise<{ mixKey: string }> {
     return { mixKey: cachedWBI.mixKey };
   }
 
-  const navData = await rawRequest<any>(
-    "/x/web-interface/nav",
-    {},
-    { includeAuth: false, useWbi: false, referer: config.referer },
-  );
+  const url = new URL("/x/web-interface/nav", BASE_URL);
+  logger.logAPIRequest("GET", url.toString(), {});
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": config.userAgent,
+        Referer: config.referer,
+        Accept: "application/json",
+      },
+    });
+  } catch (error) {
+    throw new NetworkError(
+      `请求失败：${url.toString()}`,
+      error instanceof Error ? error : undefined,
+      url.toString(),
+    );
+  }
+
+  if (!response.ok) {
+    throw new NetworkError(
+      `HTTP ${response.status}: ${response.statusText}`,
+      undefined,
+      url.toString(),
+      response.status,
+    );
+  }
+
+  const navPayload = await response.json();
+  const navData = navPayload?.data;
   const wbiImg = navData?.wbi_img;
   const imgKeyMatch = wbiImg?.img_url?.match(/([^/_]+)(?=\.[a-zA-Z]+$)/);
   const subKeyMatch = wbiImg?.sub_url?.match(/([^/_]+)(?=\.[a-zA-Z]+$)/);
@@ -303,7 +340,7 @@ async function rawRequest<T>(
 
         const json = await response.json();
         if (json.code !== 0) {
-          throw mapBilibiliError(json, url.toString());
+          throw mapBilibiliError(json, url.toString(), includeAuth);
         }
         return json.data as T;
       }),
