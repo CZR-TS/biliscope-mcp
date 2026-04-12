@@ -372,11 +372,11 @@ export async function checkLoginStatus(): Promise<{ isLogin: boolean }> {
 }
 
 export async function getVideoInfoByBvid(bvid: string): Promise<any> {
-  return rawRequest("/x/web-interface/view", { bvid }, { includeAuth: true });
+  return rawRequest("/x/web-interface/view", { bvid }, { includeAuth: false });
 }
 
 export async function getVideoInfoByAid(aid: number): Promise<any> {
-  return rawRequest("/x/web-interface/view", { aid }, { includeAuth: true });
+  return rawRequest("/x/web-interface/view", { aid }, { includeAuth: false });
 }
 
 export async function searchVideos(keyword: string, page = 1, pageSize = 10): Promise<any> {
