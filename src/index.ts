@@ -3,8 +3,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
-import { credentialManager } from "./utils/credentials.js";
-import { config, validateRuntimeConfig } from "./config.js";
+import { config } from "./config.js";
 import { startHttpServer } from "./http-server.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,8 +18,6 @@ try {
 export default server;
 
 async function main() {
-  validateRuntimeConfig();
-  await credentialManager.initialize();
   if (config.transportMode === "http") {
     await startHttpServer({
       host: config.httpHost,

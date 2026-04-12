@@ -5,7 +5,7 @@ import { program } from "commander";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
 import { credentialManager } from "./utils/credentials.js";
-import { config, validateRuntimeConfig } from "./config.js";
+import { config } from "./config.js";
 import { startHttpServer } from "./http-server.js";
 
 const packageJson = JSON.parse(
@@ -13,18 +13,13 @@ const packageJson = JSON.parse(
 );
 
 async function startStdioServer() {
-  validateRuntimeConfig();
-  await credentialManager.initialize();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("BiliScope MCP started with stdio transport");
+  console.error("CookieCloud will be checked lazily when an authenticated tool is called");
 }
 
-async function startHttpMode(shouldInitialize: boolean = true) {
-  validateRuntimeConfig();
-  if (shouldInitialize) {
-    await credentialManager.initialize();
-  }
+async function startHttpMode() {
   await startHttpServer({
     host: config.httpHost,
     port: config.httpPort,
@@ -42,9 +37,9 @@ async function startDefaultServer() {
   await startStdioServer();
 }
 
-function checkConfig() {
+async function checkConfig() {
   try {
-    validateRuntimeConfig();
+    await credentialManager.initialize();
     const status = credentialManager.getStatus();
     console.log("配置状态：可用");
     console.log(`Cookie 来源：${status.source}`);
@@ -73,6 +68,7 @@ function showHelp() {
   console.log("");
   console.log("说明：");
   console.log("  仅支持 CookieCloud，不再支持本地手动 Cookie。");
+  console.log("  启动和 list_tools 不预拉 CookieCloud，调用需要登录态的工具时才校验。");
   console.log("  ModelScope 托管部署推荐使用：npx -y biliscope-mcp@latest stdio。");
   console.log("  自己部署公网服务时推荐使用 Streamable HTTP。");
   console.log("  Streamable HTTP 默认端点：/mcp。");

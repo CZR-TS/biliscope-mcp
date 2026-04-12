@@ -1,5 +1,5 @@
 import { createDecipheriv, createHash } from "crypto";
-import { config, validateRuntimeConfig } from "../config.js";
+import { config } from "../config.js";
 import { BilibiliAPIError, NetworkError } from "./errors.js";
 import { logger } from "./logger.js";
 
@@ -129,6 +129,36 @@ function normalizeEndpoint(endpoint: string): string {
   return endpoint.endsWith("/") ? endpoint : `${endpoint}/`;
 }
 
+function ensureCookieCloudConfig(): void {
+  const source = process.env.BILIBILI_COOKIE_SOURCE;
+  if (source && source !== "cookiecloud") {
+    throw new BilibiliAPIError(
+      'BILIBILI_COOKIE_SOURCE 仅支持 "cookiecloud"，当前项目已移除手动 Cookie 模式。',
+      "COOKIECLOUD_CONFIG_INVALID",
+      undefined,
+      undefined,
+      false,
+      "请删除手动 Cookie 相关配置，只保留 CookieCloud 参数。",
+    );
+  }
+
+  const missing: string[] = [];
+  if (!config.cookieCloudEndpoint) missing.push("COOKIECLOUD_ENDPOINT");
+  if (!config.cookieCloudUuid) missing.push("COOKIECLOUD_UUID");
+  if (!config.cookieCloudPassword) missing.push("COOKIECLOUD_PASSWORD");
+
+  if (missing.length > 0) {
+    throw new BilibiliAPIError(
+      `CookieCloud 配置缺失：${missing.join(", ")}。`,
+      "COOKIECLOUD_CONFIG_INVALID",
+      undefined,
+      undefined,
+      false,
+      "请在部署 JSON 的 env 中提供 COOKIECLOUD_ENDPOINT、COOKIECLOUD_UUID、COOKIECLOUD_PASSWORD。",
+    );
+  }
+}
+
 export class CredentialManager {
   private static instance: CredentialManager;
   private credentials: BilibiliCredentials | null = null;
@@ -142,7 +172,7 @@ export class CredentialManager {
   }
 
   async initialize(): Promise<void> {
-    validateRuntimeConfig();
+    ensureCookieCloudConfig();
     await this.refreshCredentials(true);
   }
 
@@ -183,6 +213,8 @@ export class CredentialManager {
   }
 
   async refreshCredentials(force: boolean = false): Promise<BilibiliCredentials> {
+    ensureCookieCloudConfig();
+
     if (!force && !this.shouldRefresh() && this.credentials) {
       return this.credentials;
     }
