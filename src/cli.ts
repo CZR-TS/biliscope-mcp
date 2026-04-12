@@ -65,14 +65,16 @@ function showHelp() {
   console.log("BiliScope MCP - CookieCloud 自动登录版");
   console.log("");
   console.log("用法：");
-  console.log("  biliscope-mcp         启动 MCP 服务；默认 stdio，BILISCOPE_TRANSPORT=http 时启动 HTTP");
+  console.log("  biliscope-mcp         启动 MCP 服务；默认 Streamable HTTP");
+  console.log("  biliscope-mcp stdio   启动 stdio 服务，适合 ModelScope 托管检测");
   console.log("  biliscope-mcp http    启动 Streamable HTTP/SSE 服务");
   console.log("  biliscope-mcp check   检查 CookieCloud 配置");
   console.log("  biliscope-mcp help    显示帮助");
   console.log("");
   console.log("说明：");
   console.log("  仅支持 CookieCloud，不再支持本地手动 Cookie。");
-  console.log("  远程部署推荐使用 Streamable HTTP：BILISCOPE_TRANSPORT=http。");
+  console.log("  ModelScope 托管部署推荐使用：npx -y biliscope-mcp@latest stdio。");
+  console.log("  自己部署公网服务时推荐使用 Streamable HTTP。");
   console.log("  Streamable HTTP 默认端点：/mcp。");
   console.log("  兼容 SSE 默认端点：/sse，消息端点：/messages。");
 }
@@ -82,6 +84,9 @@ async function main() {
 
   program.arguments("[command]").action(async (command) => {
     switch (command) {
+      case "stdio":
+        await startStdioServer();
+        break;
       case "http":
         await startHttpMode();
         break;
@@ -108,6 +113,7 @@ async function main() {
     }
   });
 
+  program.command("stdio").description("启动 stdio MCP 服务").action(startStdioServer);
   program.command("http").description("启动 Streamable HTTP/SSE 服务").action(startHttpMode);
   program.command("check").description("检查 CookieCloud 配置").action(checkConfig);
   program.command("help").description("显示帮助").action(showHelp);
