@@ -82,9 +82,9 @@ export const config: Config = {
   ),
   userAgent: process.env.USER_AGENT || DEFAULT_CONFIG.userAgent,
   cookieSource: "cookiecloud",
-  cookieCloudEndpoint: process.env.COOKIECLOUD_ENDPOINT || "",
-  cookieCloudUuid: process.env.COOKIECLOUD_UUID || "",
-  cookieCloudPassword: process.env.COOKIECLOUD_PASSWORD || "",
+  cookieCloudEndpoint: process.env.COOKIECLOUD_ENDPOINT || process.env.CC_URL || "",
+  cookieCloudUuid: process.env.COOKIECLOUD_UUID || process.env.CC_ID || "",
+  cookieCloudPassword: process.env.COOKIECLOUD_PASSWORD || process.env.CC_PASSWORD || "",
   cookieCloudDomains: parseDomainKeywords(process.env.COOKIECLOUD_DOMAINS),
   cookieRefreshIntervalMinutes: parseIntEnv(
     process.env.COOKIE_REFRESH_INTERVAL_MINUTES,
@@ -108,9 +108,9 @@ export function validateRuntimeConfig(): void {
   }
 
   const missing: string[] = [];
-  if (!config.cookieCloudEndpoint) missing.push("COOKIECLOUD_ENDPOINT");
-  if (!config.cookieCloudUuid) missing.push("COOKIECLOUD_UUID");
-  if (!config.cookieCloudPassword) missing.push("COOKIECLOUD_PASSWORD");
+  if (!config.cookieCloudEndpoint) missing.push("COOKIECLOUD_ENDPOINT 或 CC_URL");
+  if (!config.cookieCloudUuid) missing.push("COOKIECLOUD_UUID 或 CC_ID");
+  if (!config.cookieCloudPassword) missing.push("COOKIECLOUD_PASSWORD 或 CC_PASSWORD");
 
   if (missing.length > 0) {
     throw new Error(

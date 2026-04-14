@@ -149,9 +149,9 @@ function ensureCookieCloudConfig(): void {
   }
 
   const missing: string[] = [];
-  if (!config.cookieCloudEndpoint) missing.push("COOKIECLOUD_ENDPOINT");
-  if (!config.cookieCloudUuid) missing.push("COOKIECLOUD_UUID");
-  if (!config.cookieCloudPassword) missing.push("COOKIECLOUD_PASSWORD");
+  if (!config.cookieCloudEndpoint) missing.push("COOKIECLOUD_ENDPOINT 或 CC_URL");
+  if (!config.cookieCloudUuid) missing.push("COOKIECLOUD_UUID 或 CC_ID");
+  if (!config.cookieCloudPassword) missing.push("COOKIECLOUD_PASSWORD 或 CC_PASSWORD");
 
   if (missing.length > 0) {
     throw new BilibiliAPIError(
@@ -160,7 +160,7 @@ function ensureCookieCloudConfig(): void {
       undefined,
       undefined,
       false,
-      "请在部署 JSON 的 env 中提供 COOKIECLOUD_ENDPOINT、COOKIECLOUD_UUID、COOKIECLOUD_PASSWORD。",
+      "请在部署 JSON 的 env 中提供 COOKIECLOUD_ENDPOINT/COOKIECLOUD_UUID/COOKIECLOUD_PASSWORD，或使用 CC_URL/CC_ID/CC_PASSWORD。",
     );
   }
 }
