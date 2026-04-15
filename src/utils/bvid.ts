@@ -1,106 +1,172 @@
-/**
- * BV号工具模块
- * 提供BV号的提取、验证和处理功能
- */
+import { config } from "../config.js";
+import { BilibiliAPIError, NetworkError, TimeoutError } from "./errors.js";
 
-/**
- * 从输入字符串中提取BV号
- * 支持直接BV号或包含BV号的URL
- * @param input 输入字符串（BV号或URL）
- * @returns 提取的BV号
- * @throws 当无法提取BV号时抛出错误
- */
+const BV_PATTERN = /BV[A-Za-z0-9]{10}/;
+const BILIBILI_SHORT_HOSTS = new Set(["b23.tv", "bili2233.cn"]);
+const BILIBILI_VIDEO_HOSTS = new Set([
+  "bilibili.com",
+  "www.bilibili.com",
+  "m.bilibili.com",
+]);
+const URL_PATTERN = /https?:\/\/[^\s<>"']+|(?:b23\.tv|bili2233\.cn)\/[^\s<>"']+/i;
+
 export function extractBVId(input: string): string {
   if (!input) {
-    throw new Error('Input cannot be empty');
+    throw new Error("Input cannot be empty");
   }
 
-  // 尝试从URL中提取BV号
-  const urlMatch = input.match(/(BV[a-zA-Z0-9]{10})/);
-  if (urlMatch) {
-    return urlMatch[1];
+  const match = input.match(BV_PATTERN);
+  if (match) {
+    return match[0];
   }
 
-  // 直接验证是否为BV号
-  if (/^BV[a-zA-Z0-9]{10}$/.test(input)) {
-    return input;
-  }
-
-  throw new Error('Invalid Bilibili video ID or URL');
+  throw new Error("Invalid Bilibili video ID or URL");
 }
 
-/**
- * 验证BV号格式是否正确
- * @param bvid BV号
- * @returns 是否为有效的BV号
- */
 export function isValidBVId(bvid: string): boolean {
   if (!bvid) {
     return false;
   }
-
-  // BV号格式：BV + 10个字符（字母数字组合）
   return /^BV[A-Za-z0-9]{10}$/.test(bvid);
 }
 
-/**
- * 验证BV号格式并检查基本有效性
- * @param bvid BV号
- * @throws 当BV号无效时抛出错误
- */
 export function validateBVId(bvid: string): void {
   if (!bvid) {
-    throw new Error('BV ID cannot be empty');
+    throw new Error("BV ID cannot be empty");
   }
-  
+
   if (bvid.length !== 12) {
     throw new Error(`Invalid BV ID length: expected 12 characters, got ${bvid.length}`);
   }
-  
+
   if (!isValidBVId(bvid)) {
-    throw new Error('Invalid BV ID format');
+    throw new Error("Invalid BV ID format");
   }
 }
 
-/**
- * 标准化BV号输入
- * 清理输入并提取BV号
- * @param input 输入字符串
- * @returns 标准化的BV号
- */
 export function normalizeBVId(input: string): string {
-  if (!input) {
-    throw new Error('Input cannot be empty');
-  }
-
-  // 清理输入
-  const cleaned = input.trim();
-  
-  // 提取BV号
-  const bvid = extractBVId(cleaned);
-  
-  // 转换为大写（可选，BV号大小写不敏感）
+  const bvid = extractBVId(input.trim());
   return bvid.toUpperCase();
 }
 
-/**
- * 从BV号创建标准URL
- * @param bvid BV号
- * @returns Bilibili视频标准URL
- */
 export function createVideoUrl(bvid: string): string {
   const normalizedBvid = normalizeBVId(bvid);
   return `https://www.bilibili.com/video/${normalizedBvid}`;
 }
 
-/**
- * 检查输入是否包含BV号
- * @param input 输入字符串
- * @returns 是否包含BV号
- */
 export function containsBVId(input: string): boolean {
   if (!input) {
     return false;
   }
-  return /BV[A-Za-z0-9]{10}/.test(input);
+  return BV_PATTERN.test(input);
+}
+
+function extractUrlCandidate(input: string): string | null {
+  const match = input.match(URL_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const candidate = match[0].replace(/[)\]}>，。！？、]+$/u, "");
+  if (/^https?:\/\//i.test(candidate)) {
+    return candidate;
+  }
+  return `https://${candidate}`;
+}
+
+function isAllowedBilibiliHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return BILIBILI_SHORT_HOSTS.has(normalized) || BILIBILI_VIDEO_HOSTS.has(normalized);
+}
+
+function isShortHost(hostname: string): boolean {
+  return BILIBILI_SHORT_HOSTS.has(hostname.toLowerCase());
+}
+
+async function fetchRedirectedUrl(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": config.userAgent,
+        Referer: config.referer,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    if (!response.ok && response.status >= 400) {
+      throw new NetworkError(
+        `Short link request failed: HTTP ${response.status}`,
+        undefined,
+        url,
+        response.status,
+      );
+    }
+
+    return response.url || url;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new TimeoutError("Short link resolution timed out.", config.requestTimeoutMs);
+    }
+    if (error instanceof NetworkError || error instanceof TimeoutError) {
+      throw error;
+    }
+    throw new NetworkError(
+      "Short link request failed.",
+      error instanceof Error ? error : undefined,
+      url,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function resolveBilibiliVideoInput(input: string): Promise<string> {
+  const cleaned = input.trim();
+  if (!cleaned) {
+    throw new Error("Input cannot be empty");
+  }
+
+  if (containsBVId(cleaned)) {
+    return cleaned;
+  }
+
+  const urlCandidate = extractUrlCandidate(cleaned);
+  if (!urlCandidate) {
+    return cleaned;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(urlCandidate);
+  } catch {
+    return cleaned;
+  }
+
+  if (!isAllowedBilibiliHost(parsed.hostname)) {
+    return cleaned;
+  }
+
+  if (!isShortHost(parsed.hostname)) {
+    return urlCandidate;
+  }
+
+  const redirectedUrl = await fetchRedirectedUrl(urlCandidate);
+  if (containsBVId(redirectedUrl)) {
+    return redirectedUrl;
+  }
+
+  throw new BilibiliAPIError(
+    "Bilibili short link did not resolve to a video BV URL.",
+    "VIDEO_LINK_RESOLVE_FAILED",
+    undefined,
+    { input, redirected_url: redirectedUrl },
+    true,
+    "Please confirm the short link points to a public Bilibili video page.",
+  );
 }

@@ -7,7 +7,7 @@ import {
   searchVideos,
 } from "./client.js";
 import { cacheManager } from "../utils/cache.js";
-import { extractBVId } from "../utils/bvid.js";
+import { extractBVId, resolveBilibiliVideoInput } from "../utils/bvid.js";
 import { BilibiliAPIError } from "../utils/errors.js";
 
 const LANGUAGE_PRIORITY = ["zh-Hans", "ai-zh", "zh-CN", "zh-Hant", "en"];
@@ -60,16 +60,17 @@ function mergeSubtitleBody(body: Array<{ from: number; to: number; content: stri
 }
 
 export async function resolveVideoInput(input: string): Promise<any> {
+  const normalizedInput = await resolveBilibiliVideoInput(input);
   try {
-    const bvid = extractBVId(input);
+    const bvid = extractBVId(normalizedInput);
     return getVideoInfoByBvid(bvid);
   } catch {
-    const avMatch = input.match(/(?:^|\/|av)(\d{5,})/i);
+    const avMatch = normalizedInput.match(/(?:^|\/|av)(\d{5,})/i);
     if (avMatch) {
       return getVideoInfoByAid(Number(avMatch[1]));
     }
 
-    const result = await searchVideos(input, 1, 1);
+    const result = await searchVideos(normalizedInput, 1, 1);
     const first = result?.result?.[0];
     if (!first?.bvid) {
       throw new BilibiliAPIError(

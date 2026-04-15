@@ -1,5 +1,4 @@
 import { cacheManager } from "../utils/cache.js";
-import { extractBVId } from "../utils/bvid.js";
 import { CommentsDisabledError } from "../utils/errors.js";
 import {
   getDanmakuXml,
@@ -65,7 +64,8 @@ export async function getVideoCommentsData(
   input: string,
   detailLevel: "brief" | "detailed" = "brief",
 ) {
-  const bvid = extractBVId(input);
+  const video = await resolveVideoInput(input);
+  const bvid = video.bvid;
   const cacheKey = cacheManager.generateKey("comments", bvid, detailLevel);
   const cached = cacheManager.getCommentInfo(cacheKey);
   if (cached) {
@@ -223,7 +223,8 @@ export async function getHotVideoItems(limit = 10) {
 }
 
 export async function getRelatedVideoItems(input: string) {
-  const bvid = extractBVId(input);
+  const video = await resolveVideoInput(input);
+  const bvid = video.bvid;
   const items = await getRelatedVideos(bvid);
   return {
     bvid,

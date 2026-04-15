@@ -1,12 +1,38 @@
 # BiliScope MCP
 
+## 视频输入支持
+
+从 `2.1.9` 开始，所有需要定位单个视频的工具都会先做统一解析，支持以下输入：
+
+- BV 号：`BV1w5XLBCEPJ`
+- AV 号：`av116305751448200`
+- B 站长链接：`https://www.bilibili.com/video/BV1w5XLBCEPJ`
+- 移动端/正文分享文本里包含的长链接
+- B 站短链：`https://b23.tv/tOZ2gr1`
+- `bili2233.cn` 短链
+- 关键词：用于 `resolve_video`、`get_video_detail`、`get_video_subtitles`、`get_video_danmaku` 等工具的兜底搜索
+
+短链解析方式：服务只会对白名单 B 站域名跟随重定向，不会请求任意第三方 URL。比如：
+
+```text
+【张雪峰去世，一个时代落幕-哔哩哔哩】 https://b23.tv/tOZ2gr1
+```
+
+会自动解析为：
+
+```text
+BV1w5XLBCEPJ
+```
+
+因此读取字幕时不需要你手动剪出 BV 号，直接把分享文本、短链或长链传给 `input` 即可。
+
 BiliScope MCP 是一个面向 B 站内容读取的 MCP Server，重点解决三个问题：
 
 - 在 ModelScope MCP 广场上用一段 JSON 快速部署。
 - 通过 CookieCloud 自动读取 B 站登录 Cookie，不需要手动维护 `SESSDATA`。
 - 提供稳定的 B 站读取型工具，例如搜索、视频详情、字幕、评论、弹幕、热门视频和相关推荐。
 
-当前稳定版本：`biliscope-mcp@2.1.8`
+当前稳定版本：`biliscope-mcp@2.1.9`
 
 ## 当前状态
 
@@ -38,7 +64,7 @@ ModelScope 的托管部署检测更适合使用 STDIO 配置。平台会通过 `
   "mcpServers": {
     "biliscope-mcp": {
       "command": "npx",
-      "args": ["-y", "biliscope-mcp@2.1.8", "stdio"],
+      "args": ["-y", "biliscope-mcp@2.1.9", "stdio"],
       "env": {
         "CC_URL": "https://cookies.xm.mk",
         "CC_ID": "你的UUID",
@@ -52,7 +78,7 @@ ModelScope 的托管部署检测更适合使用 STDIO 配置。平台会通过 `
 说明：
 
 - `command` 必须是 `npx`。
-- `args` 建议写死 `biliscope-mcp@2.1.8`，避免 ModelScope 缓存旧版本。
+- `args` 建议写死 `biliscope-mcp@2.1.9`，避免 ModelScope 缓存旧版本。
 - `stdio` 是给 ModelScope 托管检测用的，不是本地 HTTP 地址。
 - `env` 是首选配置方式，如果平台正确注入环境变量，字幕和评论工具可以直接使用 CookieCloud。
 - `CC_URL`、`CC_ID`、`CC_PASSWORD` 是参考 WeRead MCP 的短变量名；本项目也兼容旧变量名 `COOKIECLOUD_ENDPOINT`、`COOKIECLOUD_UUID`、`COOKIECLOUD_PASSWORD`。
@@ -499,7 +525,7 @@ CookieCloud 插件里建议这样设置：
 如果你不是用 ModelScope 托管，而是自己有公网服务器，可以直接启动 HTTP 服务：
 
 ```bash
-npx -y biliscope-mcp@2.1.8 http
+npx -y biliscope-mcp@2.1.9 http
 ```
 
 默认监听：
@@ -731,11 +757,11 @@ biliscope-mcp
 推荐版本：
 
 ```text
-2.1.8
+2.1.9
 ```
 
 推荐 ModelScope 启动命令：
 
 ```bash
-npx -y biliscope-mcp@2.1.8 stdio
+npx -y biliscope-mcp@2.1.9 stdio
 ```
