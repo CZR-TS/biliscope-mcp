@@ -2,7 +2,7 @@
 
 面向 B 站内容读取的 MCP Server，基于 CookieCloud 获取登录态，提供视频搜索、解析、详情、字幕、评论、弹幕、热门视频和相关推荐能力。
 
-当前版本：`2.1.9`
+当前版本：`2.2.1`
 
 ## 特性
 
@@ -103,7 +103,7 @@ COOKIECLOUD_PASSWORD=your-password
 
 ```json
 {
-  "keyword": "土元祭",
+  "keyword": "Python 教程",
   "page": 1,
   "page_size": 10
 }
