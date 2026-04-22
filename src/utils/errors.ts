@@ -1,7 +1,28 @@
+export interface FieldErrorDetail {
+  field: string;
+  message: string;
+  received?: unknown;
+  expected?: string;
+  allowed_values?: Array<string | number>;
+}
+
+export interface ValidationErrorOptions {
+  tool?: string;
+  fieldErrors?: FieldErrorDetail[];
+  expected?: Record<string, string>;
+}
+
 export class ValidationError extends Error {
-  constructor(message: string) {
+  tool?: string;
+  fieldErrors: FieldErrorDetail[];
+  expected?: Record<string, string>;
+
+  constructor(message: string, options: ValidationErrorOptions = {}) {
     super(message);
     this.name = "ValidationError";
+    this.tool = options.tool;
+    this.fieldErrors = options.fieldErrors ?? [];
+    this.expected = options.expected;
   }
 }
 
@@ -62,6 +83,9 @@ export function formatToolError(error: unknown): {
   retryable: boolean;
   cookie_source: "cookiecloud";
   suggestion: string;
+  tool?: string;
+  field_errors?: FieldErrorDetail[];
+  expected?: Record<string, string>;
 } {
   if (error instanceof BilibiliAPIError) {
     return {
@@ -81,7 +105,10 @@ export function formatToolError(error: unknown): {
       message: error.message,
       retryable: false,
       cookie_source: "cookiecloud",
-      suggestion: "请检查工具入参格式。",
+      suggestion: "请按字段说明修正参数后重试。",
+      tool: error.tool,
+      field_errors: error.fieldErrors,
+      expected: error.expected,
     };
   }
 
@@ -103,7 +130,7 @@ export function formatToolError(error: unknown): {
       message: error.message,
       retryable: true,
       cookie_source: "cookiecloud",
-      suggestion: "请检查网络连通性、代理或 CookieCloud 地址。",
+      suggestion: "请检查网络连通性、代理设置或 CookieCloud 地址。",
     };
   }
 

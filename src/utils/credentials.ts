@@ -1,3 +1,5 @@
+import { access, readFile, unlink, writeFile } from "fs/promises";
+import { resolve } from "path";
 import { createDecipheriv, createHash } from "crypto";
 import { config } from "../config.js";
 import { BilibiliAPIError, NetworkError } from "./errors.js";
@@ -22,6 +24,11 @@ export interface CookieCloudRuntimeConfig {
   endpoint: string;
   uuid: string;
   password: string;
+}
+
+interface EnvSnapshot {
+  existed: boolean;
+  content: string;
 }
 
 function md5Hex(input: string): string {
@@ -160,9 +167,51 @@ function ensureCookieCloudConfig(): void {
       undefined,
       undefined,
       false,
-      "请在部署 JSON 的 env 中提供 COOKIECLOUD_ENDPOINT/COOKIECLOUD_UUID/COOKIECLOUD_PASSWORD，或使用 CC_URL/CC_ID/CC_PASSWORD。",
+      "请在部署 env 中提供 CookieCloud 参数，或调用 configure_cookiecloud 写入项目根 .env。",
     );
   }
+}
+
+function serializeEnvValue(value: string): string {
+  if (/^[A-Za-z0-9_./:-]+$/.test(value)) {
+    return value;
+  }
+  return JSON.stringify(value);
+}
+
+function upsertEnvValue(content: string, key: string, value: string): string {
+  const line = `${key}=${serializeEnvValue(value)}`;
+  const pattern = new RegExp(`^(\\s*(?:export\\s+)?${key}\\s*=).*$`, "m");
+
+  if (pattern.test(content)) {
+    return content.replace(pattern, line);
+  }
+
+  const suffix = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+  return `${content}${suffix}${line}\n`;
+}
+
+async function readEnvSnapshot(envPath: string): Promise<EnvSnapshot> {
+  try {
+    await access(envPath);
+    return {
+      existed: true,
+      content: await readFile(envPath, "utf8"),
+    };
+  } catch {
+    return {
+      existed: false,
+      content: "",
+    };
+  }
+}
+
+async function restoreEnvSnapshot(envPath: string, snapshot: EnvSnapshot): Promise<void> {
+  if (!snapshot.existed) {
+    await unlink(envPath).catch(() => undefined);
+    return;
+  }
+  await writeFile(envPath, snapshot.content, "utf8");
 }
 
 export class CredentialManager {
@@ -182,12 +231,57 @@ export class CredentialManager {
     await this.refreshCredentials(true);
   }
 
-  configureCookieCloud(runtimeConfig: CookieCloudRuntimeConfig): void {
-    config.cookieCloudEndpoint = runtimeConfig.endpoint.trim();
-    config.cookieCloudUuid = runtimeConfig.uuid.trim();
-    config.cookieCloudPassword = runtimeConfig.password;
-    this.credentials = null;
-    this.refreshPromise = null;
+  async configureCookieCloud(runtimeConfig: CookieCloudRuntimeConfig): Promise<string> {
+    const nextConfig = {
+      endpoint: runtimeConfig.endpoint.trim(),
+      uuid: runtimeConfig.uuid.trim(),
+      password: runtimeConfig.password,
+    };
+
+    const previousConfig = {
+      endpoint: config.cookieCloudEndpoint,
+      uuid: config.cookieCloudUuid,
+      password: config.cookieCloudPassword,
+    };
+    const previousCredentials = this.credentials;
+    const envPath = resolve(process.cwd(), ".env");
+    const snapshot = await readEnvSnapshot(envPath);
+
+    let nextEnv = snapshot.content;
+    nextEnv = upsertEnvValue(nextEnv, "COOKIECLOUD_ENDPOINT", nextConfig.endpoint);
+    nextEnv = upsertEnvValue(nextEnv, "COOKIECLOUD_UUID", nextConfig.uuid);
+    nextEnv = upsertEnvValue(nextEnv, "COOKIECLOUD_PASSWORD", nextConfig.password);
+    await writeFile(envPath, nextEnv, "utf8");
+
+    try {
+      config.cookieCloudEndpoint = nextConfig.endpoint;
+      config.cookieCloudUuid = nextConfig.uuid;
+      config.cookieCloudPassword = nextConfig.password;
+      process.env.COOKIECLOUD_ENDPOINT = nextConfig.endpoint;
+      process.env.COOKIECLOUD_UUID = nextConfig.uuid;
+      process.env.COOKIECLOUD_PASSWORD = nextConfig.password;
+      process.env.CC_URL = nextConfig.endpoint;
+      process.env.CC_ID = nextConfig.uuid;
+      process.env.CC_PASSWORD = nextConfig.password;
+      this.credentials = null;
+      this.refreshPromise = null;
+      await this.initialize();
+      return envPath;
+    } catch (error) {
+      config.cookieCloudEndpoint = previousConfig.endpoint;
+      config.cookieCloudUuid = previousConfig.uuid;
+      config.cookieCloudPassword = previousConfig.password;
+      process.env.COOKIECLOUD_ENDPOINT = previousConfig.endpoint;
+      process.env.COOKIECLOUD_UUID = previousConfig.uuid;
+      process.env.COOKIECLOUD_PASSWORD = previousConfig.password;
+      process.env.CC_URL = previousConfig.endpoint;
+      process.env.CC_ID = previousConfig.uuid;
+      process.env.CC_PASSWORD = previousConfig.password;
+      this.credentials = previousCredentials;
+      this.refreshPromise = null;
+      await restoreEnvSnapshot(envPath, snapshot);
+      throw error;
+    }
   }
 
   getStatus() {
@@ -219,7 +313,7 @@ export class CredentialManager {
         undefined,
         undefined,
         false,
-        "请检查 CookieCloud 是否已同步到最新的 B 站登录态。",
+        "请检查 CookieCloud 是否已同步到最新的 B 站登录状态。",
       );
     }
 
@@ -276,7 +370,7 @@ export class CredentialManager {
 
     if (!response.ok) {
       throw new BilibiliAPIError(
-        `CookieCloud 请求失败，HTTP ${response.status}。`,
+        `CookieCloud 请求失败：HTTP ${response.status}。`,
         "COOKIECLOUD_FETCH_FAILED",
         response.status,
         undefined,
@@ -301,7 +395,7 @@ export class CredentialManager {
         undefined,
         error,
         false,
-        "请确认使用的是浏览器插件中的“用户KEY·UUID”和“端对端加密密码”。",
+        "请确认使用的是 CookieCloud 插件中的“用户 KEY / UUID”和“端对端加密密码”。",
       );
     }
 
@@ -315,7 +409,7 @@ export class CredentialManager {
         undefined,
         error,
         false,
-        "请检查 CookieCloud 服务是否被额外包装或篡改。",
+        "请检查 CookieCloud 服务是否被额外包裹或篡改。",
       );
     }
 

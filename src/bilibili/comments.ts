@@ -7,7 +7,7 @@ import {
   getVideoComments,
   searchVideos,
 } from "./client.js";
-import { resolveVideoInput } from "./subtitle.js";
+import { resolveVideoWithPage } from "./subtitle.js";
 
 function filterEmojis(text: string): string {
   return text.replace(/\[[^\]]+\]/g, "").trim();
@@ -64,8 +64,8 @@ export async function getVideoCommentsData(
   input: string,
   detailLevel: "brief" | "detailed" = "brief",
 ) {
-  const video = await resolveVideoInput(input);
-  const bvid = video.bvid;
+  const context = await resolveVideoWithPage(input, 1);
+  const bvid = context.videoData.bvid;
   const cacheKey = cacheManager.generateKey("comments", bvid, detailLevel);
   const cached = cacheManager.getCommentInfo(cacheKey);
   if (cached) {
@@ -136,9 +136,9 @@ export async function getVideoCommentsData(
   }
 }
 
-export async function getVideoDanmaku(input: string, limit = 100) {
-  const video = await resolveVideoInput(input);
-  const xml = await getDanmakuXml(video.cid);
+export async function getVideoDanmaku(input: string, limit = 100, page = 1) {
+  const context = await resolveVideoWithPage(input, page);
+  const xml = await getDanmakuXml(context.selectedCid);
   const matches = [...xml.matchAll(/<d p="([^"]+)">([\s\S]*?)<\/d>/g)];
   const items = matches.slice(0, Math.min(limit, 200)).map((match) => {
     const [time] = match[1].split(",");
@@ -155,22 +155,25 @@ export async function getVideoDanmaku(input: string, limit = 100) {
   });
 
   return {
-    bvid: video.bvid,
-    cid: video.cid,
+    bvid: context.videoData.bvid,
+    cid: context.selectedCid,
     total: matches.length,
     returned: items.length,
     truncated: matches.length > items.length,
+    selected_page: context.selectedPage,
+    selected_part: context.selectedPart,
     items,
   };
 }
 
-export async function getVideoDetail(input: string) {
-  const video = await resolveVideoInput(input);
+export async function getVideoDetail(input: string, page = 1) {
+  const context = await resolveVideoWithPage(input, page);
+  const video = context.videoData;
   return {
     title: video.title,
     bvid: video.bvid,
     aid: video.aid,
-    cid: video.cid,
+    cid: context.selectedCid,
     url: `https://www.bilibili.com/video/${video.bvid}`,
     description: video.desc || "",
     cover: video.pic,
@@ -192,15 +195,16 @@ export async function getVideoDetail(input: string) {
       like: video.stat?.like ?? 0,
     },
     tags: Array.isArray(video.tag) ? video.tag.map((item: any) => item.tag_name) : [],
-    pages: Array.isArray(video.pages)
-      ? video.pages.map((page: any) => ({
-          page: page.page,
-          cid: page.cid,
-          part: page.part,
-          duration_seconds: page.duration,
-          duration_text: formatDuration(page.duration),
-        }))
-      : [],
+    pages: context.pages.map((item) => ({
+      page: item.page,
+      cid: item.cid,
+      part: item.part,
+      duration_seconds: item.duration,
+      duration_text: formatDuration(item.duration),
+    })),
+    selected_page: context.selectedPage,
+    selected_cid: context.selectedCid,
+    selected_part: context.selectedPart,
     login_required: Boolean(video.need_login_subtitle),
   };
 }
@@ -223,8 +227,8 @@ export async function getHotVideoItems(limit = 10) {
 }
 
 export async function getRelatedVideoItems(input: string) {
-  const video = await resolveVideoInput(input);
-  const bvid = video.bvid;
+  const context = await resolveVideoWithPage(input, 1);
+  const bvid = context.videoData.bvid;
   const items = await getRelatedVideos(bvid);
   return {
     bvid,
@@ -240,16 +244,28 @@ export async function getRelatedVideoItems(input: string) {
   };
 }
 
-export async function getResolvedVideoData(input: string) {
-  const video = await resolveVideoInput(input);
+export async function getResolvedVideoData(input: string, page = 1) {
+  const context = await resolveVideoWithPage(input, page);
+  const video = context.videoData;
   return {
     title: video.title,
     bvid: video.bvid,
     aid: video.aid,
+    cid: context.selectedCid,
     url: `https://www.bilibili.com/video/${video.bvid}`,
     author: video.owner?.name,
     duration: formatDuration(video.duration),
     publish_time: video.pubdate ? new Date(video.pubdate * 1000).toISOString() : undefined,
     description: video.desc || "",
+    pages: context.pages.map((item) => ({
+      page: item.page,
+      cid: item.cid,
+      part: item.part,
+      duration_seconds: item.duration,
+      duration_text: formatDuration(item.duration),
+    })),
+    selected_page: context.selectedPage,
+    selected_cid: context.selectedCid,
+    selected_part: context.selectedPart,
   };
 }

@@ -113,7 +113,7 @@ function mapBilibiliError(payload: any, url: string, includeAuth: boolean): Bili
   if (code === -101 || /未登录|登录|cookie/i.test(message)) {
     if (!includeAuth) {
       return new BilibiliAPIError(
-        "B 站公开接口要求登录或临时拒绝了未登录请求。",
+        "B 站公开接口要求登录，或临时拒绝了未登录请求。",
         "BILIBILI_PUBLIC_AUTH_REQUIRED",
         undefined,
         payload,
@@ -128,7 +128,7 @@ function mapBilibiliError(payload: any, url: string, includeAuth: boolean): Bili
       undefined,
       payload,
       true,
-      "请确认 CookieCloud 已同步到最新 B 站 Cookie。",
+      "请确认 CookieCloud 已同步到最新的 B 站 Cookie。",
     );
   }
 
@@ -139,7 +139,7 @@ function mapBilibiliError(payload: any, url: string, includeAuth: boolean): Bili
       undefined,
       payload,
       true,
-      "请检查 CookieCloud 是否同步到最新浏览器状态。",
+      "请检查 CookieCloud 是否同步到了最新的浏览器状态。",
     );
   }
 
@@ -150,7 +150,7 @@ function mapBilibiliError(payload: any, url: string, includeAuth: boolean): Bili
       undefined,
       payload,
       false,
-      "该视频可能关闭了评论或当前接口不可访问。",
+      "该视频可能关闭了评论，或当前评论接口不可访问。",
     );
   }
 

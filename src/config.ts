@@ -1,3 +1,16 @@
+import { config as loadDotenv } from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+try {
+  loadDotenv({ path: resolve(__dirname, "../.env") });
+} catch {
+  // .env is optional
+}
+
 export interface Config {
   rateLimitMs: number;
   wbiCacheExpirationMs: number;
@@ -92,7 +105,10 @@ export const config: Config = {
   ),
   transportMode: parseTransportMode(process.env.BILISCOPE_TRANSPORT),
   httpHost: process.env.BILISCOPE_HTTP_HOST || process.env.HOST || DEFAULT_CONFIG.httpHost,
-  httpPort: parseIntEnv(process.env.BILISCOPE_HTTP_PORT || process.env.PORT, DEFAULT_CONFIG.httpPort),
+  httpPort: parseIntEnv(
+    process.env.BILISCOPE_HTTP_PORT || process.env.PORT,
+    DEFAULT_CONFIG.httpPort,
+  ),
   httpMcpPath: process.env.BILISCOPE_HTTP_MCP_PATH || DEFAULT_CONFIG.httpMcpPath,
   httpSsePath: process.env.BILISCOPE_HTTP_SSE_PATH || DEFAULT_CONFIG.httpSsePath,
   httpMessagesPath:
@@ -114,7 +130,7 @@ export function validateRuntimeConfig(): void {
 
   if (missing.length > 0) {
     throw new Error(
-      `CookieCloud 配置缺失：${missing.join(", ")}。部署时请只通过 env 提供 CookieCloud 参数。`,
+      `CookieCloud 配置缺失：${missing.join(", ")}。部署时请通过 env 提供 CookieCloud 参数。`,
     );
   }
 }

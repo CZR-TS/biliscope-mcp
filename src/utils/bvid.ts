@@ -101,7 +101,7 @@ async function fetchRedirectedUrl(url: string): Promise<string> {
 
     if (!response.ok && response.status >= 400) {
       throw new NetworkError(
-        `Short link request failed: HTTP ${response.status}`,
+        `短链接请求失败：HTTP ${response.status}`,
         undefined,
         url,
         response.status,
@@ -111,13 +111,13 @@ async function fetchRedirectedUrl(url: string): Promise<string> {
     return response.url || url;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new TimeoutError("Short link resolution timed out.", config.requestTimeoutMs);
+      throw new TimeoutError("短链接解析超时。", config.requestTimeoutMs);
     }
     if (error instanceof NetworkError || error instanceof TimeoutError) {
       throw error;
     }
     throw new NetworkError(
-      "Short link request failed.",
+      "短链接请求失败。",
       error instanceof Error ? error : undefined,
       url,
     );
@@ -162,11 +162,11 @@ export async function resolveBilibiliVideoInput(input: string): Promise<string> 
   }
 
   throw new BilibiliAPIError(
-    "Bilibili short link did not resolve to a video BV URL.",
+    "B 站短链接没有解析到视频 BV 地址。",
     "VIDEO_LINK_RESOLVE_FAILED",
     undefined,
     { input, redirected_url: redirectedUrl },
     true,
-    "Please confirm the short link points to a public Bilibili video page.",
+    "请确认短链接指向的是公开可访问的 B 站视频页面。",
   );
 }

@@ -57,10 +57,10 @@ async function checkConfig() {
 function showHelp() {
   console.log(`biliscope-mcp ${packageJson.version}`);
   console.log("");
-  console.log("BiliScope MCP - CookieCloud 自动登录版");
+  console.log("BiliScope MCP - 基于 CookieCloud 的 B 站读取工具");
   console.log("");
   console.log("用法：");
-  console.log("  biliscope-mcp         启动 MCP 服务；默认 Streamable HTTP");
+  console.log("  biliscope-mcp         启动 MCP 服务；默认使用 Streamable HTTP");
   console.log("  biliscope-mcp stdio   启动 stdio 服务，适合 ModelScope 托管检测");
   console.log("  biliscope-mcp http    启动 Streamable HTTP/SSE 服务");
   console.log("  biliscope-mcp check   检查 CookieCloud 配置");
@@ -70,7 +70,7 @@ function showHelp() {
   console.log("  仅支持 CookieCloud，不再支持本地手动 Cookie。");
   console.log("  启动和 list_tools 不预拉 CookieCloud，调用需要登录态的工具时才校验。");
   console.log("  ModelScope 托管部署推荐使用：npx -y biliscope-mcp@latest stdio。");
-  console.log("  自己部署公网服务时推荐使用 Streamable HTTP。");
+  console.log("  自建公网服务时推荐使用 Streamable HTTP。");
   console.log("  Streamable HTTP 默认端点：/mcp。");
   console.log("  兼容 SSE 默认端点：/sse，消息端点：/messages。");
 }
@@ -87,7 +87,7 @@ async function main() {
         await startHttpMode();
         break;
       case "check":
-        checkConfig();
+        await checkConfig();
         break;
       case "help":
       case "--help":
